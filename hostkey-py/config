@@ -1,0 +1,37 @@
+# The config file for the daemon portion of the hostkey-tools.
+# After making modifications to this file, please restart hostkeyd to re-read it.
+
+# This file is a sample; to alter a particular value, uncomment it, and set as desired.
+# hostkeyd will use sane defaults, in the absence of this configuration file.
+
+[runtime]
+#
+## The directory into which hostkeyd should write various pieces of state,
+## such as post-boot scripts.
+## This directory will be automatically created if it does not exist.
+#state-directory = /var/lib/hostkey
+#
+## The directory into which hostkeyd should write the PID file corresponding to itself.
+## This directory will be automatically created if it does not exist.
+#pid-directory = /var/run
+#
+## The filename to be used for hostkeyd's PID lockfile
+#pid-file = hostkey.pid
+
+[logging]
+## The directory in which hostkeyd should create log files.
+## This directory will be automatically created if it does not exist.
+#log-directory = /var/log/hostkey
+#
+## The filename to be used for hostkeyd's log file.
+#log-file = hostkey.log
+#
+## The default log level for hostkeyd.
+#log-level = DEBUG
+#
+## Neucad rotates log files. You may specify how many archived log files to keep here.
+#log-retain = 5
+#
+## Neucad rotates log files after they exceed a certain size.
+## You may specify the file size that results in a log file being rotated here.
+#log-size = 5000000

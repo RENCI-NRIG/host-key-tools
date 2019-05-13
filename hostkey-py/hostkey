@@ -1,0 +1,5 @@
+#!/bin/python
+
+from host_key_tools.hostkey import main
+
+main()
