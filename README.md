@@ -28,7 +28,7 @@ Options:
 
 ## Verify hostkey daemon is running
 ```
-ps -eaf | grep hostkeyd 
-root 11133 1 2 14:12 ? 00:00:00 python /usr/bin/hostkeyd start
+[root@master0 system]# ps -eaf | grep python
+root      1663     1  0 18:32 ?        00:00:01 python /usr/bin/hostkeyd start -c https://18.221.238.74:8111/ -s abcd-5678 -r abcd-5678read -w abcd-5678write -i master0
 ```
 
