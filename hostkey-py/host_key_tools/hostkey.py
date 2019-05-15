@@ -46,7 +46,7 @@ class HostNamePubKeyCustomizer():
         self.writeToken = writeToken
         self.rId = rId
         self.hostName = rId
-        self.ip = None 
+        self.ip = None
         self.hostsFile = '/etc/hosts'
         self.keysFile = '/root/.ssh/authorized_keys'
         self.publicKey = '/root/.ssh/id_rsa.pub'
@@ -332,7 +332,8 @@ class HostNamePubKeyCustomizer():
                 for h in hosts :
                     self.log.debug("Processing host " + h["hostName"])
                     self.log.debug("h[ip]=" + h["ip"] + " ip=" + self.ip)
-                    if h["hostName"].replace('/','-') == self.hostName and h["ip"] != self.ip :
+                    if h["hostName"].replace('/','-') == self.hostName and h["ip"] != "" :
+                    #if h["hostName"].replace('/','-') == self.hostName and h["ip"] != self.ip :
                          h["ip"] = self.ip
                          checker = True
                 if checker :
