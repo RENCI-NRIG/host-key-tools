@@ -332,7 +332,7 @@ class HostNamePubKeyCustomizer():
                 for h in hosts :
                     self.log.debug("Processing host " + h["hostName"])
                     self.log.debug("h[ip]=" + h["ip"] + " ip=" + self.ip)
-                    if h["hostName"].replace('/','-') == self.hostName and h["ip"] != "" :
+                    if h["hostName"].replace('/','-') == self.hostName and h["ip"] == "" :
                     #if h["hostName"].replace('/','-') == self.hostName and h["ip"] != self.ip :
                          h["ip"] = self.ip
                          checker = True
