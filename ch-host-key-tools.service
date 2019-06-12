@@ -1,0 +1,12 @@
+[Unit]
+Description=Host name and key post-boot configuration daemon
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/hostkeyd start -c COMETHOST -s SLICEID -r RTOKEN -w WTOKEN -i NODENAME
+ExecStop=/usr/bin/hostkeyd stop
+Restart=on-failure
+PIDFile=/var/run/hostkey.pid
+
+[Install]
+WantedBy=multi-user.target

@@ -21,7 +21,7 @@
 import os
 import tempfile
 
-from neuca_guest_tools import LOGGER
+from host_key_tools import LOGGER
 
 import logging
 import logging.handlers
