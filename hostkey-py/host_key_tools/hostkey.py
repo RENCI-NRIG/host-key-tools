@@ -162,6 +162,8 @@ class HostNamePubKeyCustomizer():
                         continue
 
                     self.log.debug("processing " + e["key"])
+                    if e["value"] == "" :
+                        continue
                     hosts = json.loads(json.loads(e["value"])["val_"])
                     for h in hosts:
                         if h["ip"] == "" :
@@ -255,6 +257,8 @@ class HostNamePubKeyCustomizer():
                     if e["key"] == self.rId :
                         continue
                     self.log.debug("processing " + e["key"])
+                    if e["value"] == "" :
+                        continue
                     keys = json.loads(json.loads(e["value"])["val_"])
                     for k in keys:
                         if k["publicKey"] == "" :
