@@ -75,7 +75,7 @@ class HostNamePubKeyCustomizer():
 
     def getPublicIP(self):
         try:
-             cmd = ["/bin/python", "/usr/bin/neuca-get-public-ip"]
+             cmd = ["/bin/curl", "-s", "http://169.254.169.254/2009-04-04/meta-data/public-ipv4"]
              (rtncode, data_stdout, data_stderr) = Commands.run(cmd, timeout=60)
              self.ip = data_stdout.strip()
         except Exception as e:
