@@ -378,8 +378,7 @@ class HostNamePubKeyCustomizer():
     def run(self):
         while True:
             try:
-                if self.ip is None:
-                     self.getPublicIP()
+                self.getPublicIP()
                 self.log.debug('Polling')
                 self.updateHostsToComet()
                 self.updatePubKeysToComet()
