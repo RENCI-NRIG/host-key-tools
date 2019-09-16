@@ -29,6 +29,7 @@ import logging
 import logging.handlers
 
 from comet_common_iface import *
+from monitor import *
 from optparse import OptionParser
 from daemon import runner
 
@@ -39,7 +40,7 @@ from host_key_tools import CONFIG, LOGGER
 
 class HostNamePubKeyCustomizer():
 
-    def __init__(self, cometHost, sliceId, readToken, writeToken, rId):
+    def __init__(self, cometHost, sliceId, readToken, writeToken, rId, kafkahost):
         self.cometHost = cometHost
         self.sliceId = sliceId
         self.readToken = readToken
@@ -61,6 +62,7 @@ class HostNamePubKeyCustomizer():
         self.pidDir = '/var/run'
         self.pidfile_path = (self.pidDir + '/' + "hostkey.pid" )
         self.pidfile_timeout = 10000
+        self.kafkahost = kafkahost
 
 
         self.log = logging.getLogger(LOGGER)
@@ -375,6 +377,11 @@ class HostNamePubKeyCustomizer():
             self.log.error("sliceId/rId/readToken could not be determined")
             return None
 
+    def monitorResources(self):
+        if self.kafkahost is not None:
+            mon=ResourceMonitor(self.sliceId, self.kafkahost, self.log)
+            mon.monitorAndSend()
+
     def run(self):
         while True:
             try:
@@ -384,6 +391,7 @@ class HostNamePubKeyCustomizer():
                 self.updatePubKeysToComet()
                 self.updatePubKeysFromComet()
                 self.updateHostsFromComet()
+                self.monitorResources()
                 self.firstRun = False
             except KeyboardInterrupt:
                 self.log.error('Terminating on keyboard interrupt...')
@@ -432,6 +440,13 @@ def main():
         type = str,
         help='id'
     )
+    parser.add_option(
+        '-k',
+        '--kafkahost',
+        dest='kafkahost',
+        type = str,
+        help='kafkahost'
+    )
 
     options, args = parser.parse_args()
 
@@ -463,7 +478,7 @@ def main():
     log = logging.getLogger(LOGGER)
     log.setLevel('DEBUG')
 
-    app = HostNamePubKeyCustomizer(options.cometHost, options.sliceId, options.readToken, options.writeToken, options.id)
+    app = HostNamePubKeyCustomizer(options.cometHost, options.sliceId, options.readToken, options.writeToken, options.id, options.kafkahost)
     daemon_runner = runner.DaemonRunner(app)
 
     try:
