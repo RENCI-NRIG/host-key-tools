@@ -377,10 +377,55 @@ class HostNamePubKeyCustomizer():
             self.log.error("sliceId/rId/readToken could not be determined")
             return None
 
+    def monitorAndSendToComet(self):
+        try:
+            self.log.debug("monitorAndSendToComet:Updating resourcesall in comet")
+            if self.sliceId is not None and self.rId is not None and self.readToken is not None and self.writeToken is not None:
+                checker = None
+                section = "resourcesall"
+                comet = CometInterface(self.cometHost, None, None, None, self.log)
+                self.log.debug("monitorAndSendToComet:Processing section " + section)
+                resources = self.getCometData(section)
+                if resources is None:
+                    self.log.debug("monitorAndSendToComet:empty section " + section)
+                    return
+                for r in resources:
+                    self.log.debug(r)
+                    if "cpu" in r :
+                        cpuUsage = psutil.cpu_times_percent()._asdict()
+                        if r["cpu"] != cpuUsage :
+                            r["cpu"] = cpuUsage
+                            checker = True
+                    if "memory" in r :
+                        memUsage = psutil.virtual_memory()._asdict()
+                        if r["memory"] != memUsage :
+                            r["memory"] = memUsage
+                            checker = True
+                    if "disk" in r :
+                        diskUsage = psutil.disk_usage("/")._asdict()
+                        if r["disk"] != diskUsage :
+                            r["disk"] = diskUsage
+                            checker = True
+                if checker :
+                    val = {}
+                    val["val_"] = json.dumps(resources)
+                    newVal = json.dumps(val)
+                    self.log.debug("Updating " + section + "=" + newVal)
+                    resp = comet.invokeRoundRobinApi('update_family', self.sliceId, self.rId, self.readToken, self.writeToken, section, json.loads(newVal))
+                    if resp.status_code != 200:
+                        self.log.error("monitorAndSendToComet:Failure occured in updating resourcesall to comet" + section)
+                else :
+                    self.log.debug("monitorAndSendToComet:Nothing to update")
+        except Exception as e:
+            self.log.error('monitorAndSendToComet: Exception was of type: %s' % (str(type(e))))
+            self.log.error('monitorAndSendToComet: Exception : %s' % (str(e)))
+
     def monitorResources(self):
         if self.kafkahost is not None:
             mon=ResourceMonitor(self.sliceId, self.kafkahost, self.log)
             mon.monitorAndSend()
+        else:
+            self.monitorAndSendToComet()
 
     def run(self):
         while True:
