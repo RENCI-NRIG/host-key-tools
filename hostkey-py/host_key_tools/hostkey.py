@@ -166,15 +166,19 @@ class HostNamePubKeyCustomizer():
                     self.log.debug("processing " + e["key"])
                     if e["value"] == "\"\"" :
                         continue
-                    hosts = json.loads(json.loads(e["value"])["val_"])
-                    for h in hosts:
-                        if h["ip"] == "" :
-                            continue
+                    try:
+                        hosts = json.loads(json.loads(e["value"])["val_"])
+                        for h in hosts:
+                            if h["ip"] == "" :
+                                continue
 
-                        self.log.debug("check if " + h["hostName"] + " exists")
-                        newHostsEntry = h["ip"] + '\t' + h["hostName"] + '\n'
-                        newHostsEntry = newHostsEntry.replace('/','-')
-                        newHosts.append(str(newHostsEntry))
+                            self.log.debug("check if " + h["hostName"] + " exists")
+                            newHostsEntry = h["ip"] + '\t' + h["hostName"] + '\n'
+                            newHostsEntry = newHostsEntry.replace('/','-')
+                            newHosts.append(str(newHostsEntry))
+                    except Exception as e:
+                        self.log.error('updateHostsFromComet: Exception was of type: %s' % (str(type(e))))
+                        self.log.error('updateHostsFromComet: Exception : %s' % (str(e)))
 
             if newHosts is not None:
                 newHosts.sort()
@@ -261,12 +265,15 @@ class HostNamePubKeyCustomizer():
                     self.log.debug("processing " + e["key"])
                     if e["value"] == "\"\"" :
                         continue
-                    keys = json.loads(json.loads(e["value"])["val_"])
-                    for k in keys:
-                        if k["publicKey"] == "" :
-                            continue
-                        newKeys.append(k["publicKey"])
-
+                    try:
+                        keys = json.loads(json.loads(e["value"])["val_"])
+                        for k in keys:
+                            if k["publicKey"] == "" :
+                                continue
+                            newKeys.append(k["publicKey"])
+                    except Exception as e:
+                        self.log.error('updatePubKeysFromComet: Exception was of type: %s' % (str(type(e))))
+                        self.log.error('updatePubKeysFromComet: Exception : %s' % (str(e)))
             if newKeys is not None:
                 newKeys.sort()
                 self.__updateAuthorizedKeysFile(newKeys, startStr, endStr, self.keysFile)
