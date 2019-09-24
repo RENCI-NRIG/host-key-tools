@@ -16,8 +16,15 @@ class ResourceMonitor():
         else:
            self._log.debug(message)
 
-    def getCpuUsage(self):
-        return (dict(psutil.cpu_times_percent()._asdict()))
+    def getResources(self):
+        cpuUsage = psutil.cpu_times_percent()._asdict()
+        memUsage = psutil.virtual_memory()._asdict()
+        diskUsage = psutil.disk_usage("/")._asdict()
+        resources = {}
+        resources["cpu"] = cpuUsage
+        resources["memory"] = memUsage
+        resources["disk"] = diskUsage
+        return (resources)
 
     def publish_message(self, producer_instance, topic_name, key, value):
         try:
@@ -42,6 +49,6 @@ class ResourceMonitor():
     def monitorAndSend(self):
         producer = self.connect_kafka_producer(self._kafkHost)
         if producer is not None:
-            self.publish_message(producer, self._topic, socket.gethostname(), str(self.getCpuUsage()))
+            self.publish_message(producer, self._topic, socket.gethostname(), str(self.getResources()))
         else:
             self.logMessage('Unable to get a producer')
