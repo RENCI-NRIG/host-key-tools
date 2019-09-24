@@ -26,11 +26,10 @@ class ResourceMonitor():
         resources["disk"] = diskUsage
         return (resources)
 
-    def publish_message(self, producer_instance, topic_name, key, value):
+    def publish_message(self, producer_instance, topic_name, value):
         try:
-            key_bytes = key.encode(encoding='utf-8')
             value_bytes = value.encode(encoding='utf-8')
-            producer_instance.send(topic_name, key=key_bytes, value=value_bytes)
+            producer_instance.send(topic_name, value=value_bytes)
             producer_instance.flush()
             self.logMessage('Message published successfully.')
         except Exception as ex:
@@ -49,6 +48,6 @@ class ResourceMonitor():
     def monitorAndSend(self):
         producer = self.connect_kafka_producer(self._kafkHost)
         if producer is not None:
-            self.publish_message(producer, self._topic, socket.gethostname(), str(self.getResources()))
+            self.publish_message(producer, self._topic + socket.gethostname(), str(self.getResources()))
         else:
             self.logMessage('Unable to get a producer')
