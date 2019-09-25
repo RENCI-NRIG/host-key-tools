@@ -21,9 +21,9 @@ class ResourceMonitor():
         memUsage = psutil.virtual_memory()._asdict()
         diskUsage = psutil.disk_usage("/")._asdict()
         resources = {}
-        resources["cpu"] = cpuUsage
-        resources["memory"] = memUsage
-        resources["disk"] = diskUsage
+        resources["idlecpu"] = cpuUsage["idle"]
+        resources["memoryused"] = memUsage["percent"]
+        resources["diskused"] = diskUsage["percent"]
         return (resources)
 
     def publish_message(self, producer_instance, topic_name, value):
