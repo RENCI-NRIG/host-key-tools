@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import psutil
 import socket
+import json
 from kafka import KafkaProducer
 
 class ResourceMonitor():
@@ -24,7 +25,7 @@ class ResourceMonitor():
         resources["idlecpu"] = cpuUsage["idle"]
         resources["memoryused"] = memUsage["percent"]
         resources["diskused"] = diskUsage["percent"]
-        return (resources)
+        return (json.dumps(resources))
 
     def publish_message(self, producer_instance, topic_name, value):
         try:
