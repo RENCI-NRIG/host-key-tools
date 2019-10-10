@@ -454,6 +454,11 @@ class HostNamePubKeyCustomizer():
                 self.log.error('Exception was of type: %s' % (str(type(e))))
             time.sleep(10)
 
+    def cleanup(self):
+        if self.kafkahost is not None:
+             mon=ResourceMonitor(self.sliceId, self.kafkahost, self.log)
+             mon.deleteTopics()
+
 def main():
     usagestr = 'Usage: %prog start|stop|restart options'
     parser = OptionParser(usage=usagestr)
@@ -521,9 +526,9 @@ def main():
     try:
     	logfd = open(initial_log_location, 'r')
     except:
-	    initial_log_location = '/dev/null'
+	initial_log_location = '/dev/null'
     else:
-	    logfd.close()
+	logfd.close()
 
     log_format = '%(asctime)s - %(levelname)s - %(message)s'
     logging.basicConfig(format=log_format, filename=initial_log_location)
@@ -561,10 +566,13 @@ def main():
                  handler.stream,
              ]
 
-
         log.info('Administrative operation: %s' % args[0])
         daemon_runner.do_action()
         log.info('Administrative after action: %s' % args[0])
+
+        if args[0] == 'stop':
+            app.cleanup()
+
     except runner.DaemonRunnerStopFailureError as drsfe:
         log.propagate = True
         log.error('Unable to stop service; reason was: %s' % str(drsfe))

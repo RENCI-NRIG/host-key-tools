@@ -2,7 +2,7 @@
 import psutil
 import socket
 import json
-from kafka import KafkaProducer
+from kafka import *
 
 class ResourceMonitor():
 
@@ -52,3 +52,8 @@ class ResourceMonitor():
             self.publish_message(producer, self._topic + socket.gethostname(), str(self.getResources()))
         else:
             self.logMessage('Unable to get a producer')
+
+    def deleteTopics(self):
+        topics = [self._topic]
+        a = KafkaAdminClient(bootstrap_servers=[self._kafkHost])
+        a.delete_topics(topics, timeout_ms=30)
