@@ -4,7 +4,7 @@ After=neuca-guest-tools.service
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/hostkeyd start -c COMETHOST -s SLICEID -r RTOKEN -w WTOKEN -i NODENAME
+ExecStart=/usr/bin/hostkeyd start -c COMETHOST -s SLICEID -r RTOKEN -w WTOKEN
 ExecStop=/usr/bin/hostkeyd stop
 Restart=on-failure
 PIDFile=/var/run/hostkey.pid

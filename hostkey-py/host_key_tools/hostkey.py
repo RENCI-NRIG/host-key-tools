@@ -45,6 +45,8 @@ class HostNamePubKeyCustomizer():
         self.sliceId = sliceId
         self.readToken = readToken
         self.writeToken = writeToken
+        if rId is None:
+            rId = socket.gethostname()
         self.rId = rId
         self.hostName = rId
         self.ip = None
