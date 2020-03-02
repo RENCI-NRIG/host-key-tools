@@ -10,6 +10,9 @@ class ResourceMonitor():
         self._kafkHost = kafkaHost
         self._topic = topic
         self._log = log
+        self._ssl_cafile = '/var/private/ssl/ca.crt'
+        self._ssl_certfile = '/var/private/ssl/client.pem'
+        self._ssl_keyfile = '/var/private/ssl/key.pem'
 
     def logMessage(self, message):
         if self._log is None:
@@ -40,7 +43,16 @@ class ResourceMonitor():
     def connect_kafka_producer(self, host='localhost:9092'):
         _producer = None
         try:
-            _producer = KafkaProducer(bootstrap_servers=[host], api_version=(0, 10))
+            if '9092' in host:
+                _producer = KafkaProducer(bootstrap_servers=[host], api_version=(0, 10))
+            else:
+                _producer = KafkaProducer(bootstrap_servers=[host],
+                                          api_version=(0, 10),
+                                          security_protocol='SSL',
+                                          ssl_check_hostname=False,
+                                          ssl_cafile=self._ssl_cafile,
+                                          ssl_certfile=self._ssl_certfile,
+                                          ssl_keyfile=self._ssl_keyfile)
         except Exception as ex:
             self.logMessage('Exception while connecting Kafka %s' % (str(type(ex))))
         finally:
@@ -55,5 +67,14 @@ class ResourceMonitor():
 
     def deleteTopics(self):
         topics = [self._topic]
-        a = KafkaAdminClient(bootstrap_servers=[self._kafkHost])
+        a = None
+        if '9092' in host:
+            a = KafkaAdminClient(bootstrap_servers=[self._kafkHost])
+        else :
+            a = KafkaAdminClient(bootstrap_servers=[self._kafkHost],
+                                 security_protocol='SSL',
+                                 ssl_check_hostname=False,
+                                 ssl_cafile=self._ssl_cafile,
+                                 ssl_certfile=self._ssl_certfile,
+                                 ssl_keyfile=self._ssl_keyfile)
         a.delete_topics(topics, timeout_ms=30)
