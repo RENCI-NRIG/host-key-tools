@@ -5,7 +5,7 @@ import json
 from kafka import *
 from ssl import create_default_context, Purpose
 
-def _create_ssl_context(*, cafile=None, capath=None, cadata=None,
+def _create_ssl_context(cafile=None, capath=None, cadata=None,
                        certfile=None, keyfile=None, password=None,
                        crlfile=None):
     """
