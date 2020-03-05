@@ -24,23 +24,22 @@ import time
 import glob
 import json
 import sys
-
+import string
 import logging
 import logging.handlers
 
-from comet_common_iface import *
-from monitor import *
+import psutil
 from optparse import OptionParser
 from daemon import runner
 
+from host_key_tools.comet_common_iface import CometInterface
+from host_key_tools.monitor import ResourceMonitor
 from host_key_tools.util import Commands
-from host_key_tools import CONFIG, LOGGER
-
-#LOGGER = 'hostkey_daemon'
+from host_key_tools import LOGGER
 
 class HostNamePubKeyCustomizer():
 
-    def __init__(self, cometHost, sliceId, readToken, writeToken, rId, kafkahost):
+    def __init__(self, cometHost, sliceId, readToken, writeToken, rId, kafkahost, kafkaTopic):
         self.cometHost = cometHost
         self.sliceId = sliceId
         self.readToken = readToken
@@ -65,7 +64,7 @@ class HostNamePubKeyCustomizer():
         self.pidfile_path = (self.pidDir + '/' + "hostkey.pid" )
         self.pidfile_timeout = 10000
         self.kafkahost = kafkahost
-
+        self.kafkaTopic = kafkaTopic
 
         self.log = logging.getLogger(LOGGER)
 
@@ -157,7 +156,7 @@ class HostNamePubKeyCustomizer():
             resp = comet.invokeRoundRobinApi('enumerate_families', self.sliceId, None, self.readToken, None, section, None)
 
             if resp.status_code != 200:
-                self.log.error("Failure occured in enumerating family from comet" + section)
+                self.log.error("Failure occurred in enumerating family from comet" + section)
                 return
 
             if resp.json()["value"] and resp.json()["value"]["entries"]:
@@ -431,7 +430,7 @@ class HostNamePubKeyCustomizer():
 
     def monitorResources(self):
         if self.kafkahost is not None:
-            mon=ResourceMonitor(self.sliceId, self.kafkahost, self.log)
+            mon=ResourceMonitor(self.kafkaTopic, self.kafkahost, self.log)
             mon.monitorAndSend()
         else:
             self.monitorAndSendToComet()
@@ -506,6 +505,13 @@ def main():
         type = str,
         help='kafkahost'
     )
+    parser.add_option(
+        '-t',
+        '--kafkatopic',
+        dest='kafkatopic',
+        type=str,
+        help='kafkatopic'
+    )
 
     options, args = parser.parse_args()
 
@@ -537,7 +543,7 @@ def main():
     log = logging.getLogger(LOGGER)
     log.setLevel('DEBUG')
 
-    app = HostNamePubKeyCustomizer(options.cometHost, options.sliceId, options.readToken, options.writeToken, options.id, options.kafkahost)
+    app = HostNamePubKeyCustomizer(options.cometHost, options.sliceId, options.readToken, options.writeToken, options.id, options.kafkahost, options.kafkatopic)
     daemon_runner = runner.DaemonRunner(app)
 
     try:

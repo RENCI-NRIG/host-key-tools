@@ -16,7 +16,6 @@
 
 import requests
 import urllib3
-import string
 import logging
 from random import shuffle
 

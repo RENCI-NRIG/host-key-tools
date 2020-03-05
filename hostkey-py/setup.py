@@ -30,7 +30,7 @@ class hostkey_install(install):
                                    wrapper_script, alias)
                 try:
                     os.symlink(wrapper_script, alias)
-                except OSError, e:
+                except OSError as e:
                     if e.errno != EEXIST:
                         raise
             os.chdir(curr_dir)
