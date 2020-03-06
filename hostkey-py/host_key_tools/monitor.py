@@ -207,13 +207,15 @@ class ResourceMonitor():
                 try:
                     host="root@" + e["key"]
                     iperfClient = subprocess.Popen(
-                        ['ssh', '-t', host, 'iperf3', '-c', localIP, '-u', '-b', '10g', '-J'],
+                        ['ssh', '-oStrictHostKeyChecking=no', '-t', host, 'iperf3', '-c', localIP, '-u', '-b', '10g', '-J'],
                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     out, err = iperfClient.communicate()
                     self.logMessage(out)
                     if out is not None and out != "":
                         json_data = json.loads(out)
                         key=self.rId + "-" + e["key"]
+                        if key not in nw_usage:
+                            nw_usage[key] = {}
                         nw_usage[key]["bits_per_second"] = json_data["end"]["sum"]["bits_per_second"]
                         nw_usage[key]["lost_percent"] = json_data["end"]["sum"]["lost_percent"]
                         self.logMessage("Bandwidth={}".format(json_data["end"]["sum"]["bits_per_second"]))
