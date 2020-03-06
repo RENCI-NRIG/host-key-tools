@@ -100,6 +100,9 @@ class ResourceMonitor():
         resources["idlecpu"] = cpuUsage["idle"]
         resources["memoryused"] = memUsage["percent"]
         resources["diskused"] = diskUsage["percent"]
+        nw_usage = self.monitor_network_resources()
+        if len(nw_usage) != 0:
+            resources["network"] = nw_usage
         return (json.dumps(resources))
 
     def publish_message(self, producer_instance, topic_name, value):
@@ -129,7 +132,6 @@ class ResourceMonitor():
             return _producer
 
     def monitorAndSend(self):
-        self.monitor_network_resources()
         producer = self.connect_kafka_producer(self._kafkHost)
         if producer is not None:
             self.publish_message(producer, self._topic + socket.gethostname(), str(self.getResources()))
@@ -161,6 +163,7 @@ class ResourceMonitor():
         return context
 
     def monitor_network_resources(self):
+        nw_usage = {}
         comet = CometInterface(self.cometHost, None, None, None, self._log)
         section = "hostsall"
         resp = comet.invokeRoundRobinApi('enumerate_families', self.workflowId, None, self.readToken, None, section, None)
@@ -208,11 +211,16 @@ class ResourceMonitor():
                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     out, err = iperfClient.communicate()
                     self.logMessage(out)
-                    json_data = json.loads(out)
-                    self.logMessage("Bandwidth={}".format(json_data["end"]["sum"]["bits_per_second"]))
-                    self.logMessage("Loss={}".format(json_data["end"]["sum"]["lost_percent"]))
+                    if out is not None and out != "":
+                        json_data = json.loads(out)
+                        key=self.rId + "-" + e["key"]
+                        nw_usage[key]["bits_per_second"] = json_data["end"]["sum"]["bits_per_second"]
+                        nw_usage[key]["lost_percent"] = json_data["end"]["sum"]["lost_percent"]
+                        self.logMessage("Bandwidth={}".format(json_data["end"]["sum"]["bits_per_second"]))
+                        self.logMessage("Loss={}".format(json_data["end"]["sum"]["lost_percent"]))
                 except Exception as e:
                     self.logMessage('monitor_network_resources: Exception was of type: %s' % (str(type(e))))
                     self.logMessage('monitor_network_resources: Exception : %s' % (str(e)))
         self.logMessage("Terminate server iPerm")
         iperServer.terminate()
+        return nw_usage
