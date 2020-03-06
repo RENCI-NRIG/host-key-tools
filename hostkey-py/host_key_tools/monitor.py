@@ -74,7 +74,7 @@ def _create_ssl_context(cafile=None, capath=None, cadata=None,
 
 class ResourceMonitor():
 
-    def __init__(self, workflowId, readToken, cometHost, topic, kafkaHost='localhost:9092', log=None):
+    def __init__(self, workflowId, cometHost, readToken, topic, kafkaHost='localhost:9092', log=None):
         self.cometHost = cometHost
         self.readToken = readToken
         self.workflowId = workflowId
@@ -161,7 +161,7 @@ class ResourceMonitor():
         return context
 
     def monitor_network_resources(self):
-        comet = CometInterface(self.cometHost, None, None, None, self.log)
+        comet = CometInterface(self.cometHost, None, None, None, self._log)
         section = "hostsall"
         resp = comet.invokeRoundRobinApi('enumerate_families', self.workflowId, None, self.readToken, None, section, None)
 
@@ -189,7 +189,7 @@ class ResourceMonitor():
             return
 
         # Start IPerf
-        iperServer = subprocess.Popen(['iperf3', '-s', localIP], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        iperServer = subprocess.Popen(['iperf3', '-s', '-B', localIP], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         if resp.json()["value"] and resp.json()["value"]["entries"]:
             for e in resp.json()["value"]["entries"]:
@@ -202,16 +202,15 @@ class ResourceMonitor():
                 if e["value"] == "\"\"":
                     continue
                 try:
-                    hosts = json.loads(json.loads(e["value"])["val_"])
-                    for h in hosts:
-                        if h["ip"] != "":
-                            iperfClient = subprocess.Popen(
-                                ['ssh', '-t', 'root@' + 'e["key"]', 'iperf3', '-c', localIP, '-u', '-b', '10g', '-J'],
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                            out, err = iperfClient.communicate()
-                            json_data = json.loads(out)
-                            self.logMessage("Bandwidth={}".format(json_data["end"]["sum"]["bits_per_second"]))
-                            self.logMessage("Loss={}".format(json_data["end"]["sum"]["lost_percent"]))
+                    host="root@" + e["key"]
+                    iperfClient = subprocess.Popen(
+                        ['ssh', '-t', host, 'iperf3', '-c', localIP, '-u', '-b', '10g', '-J'],
+                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    out, err = iperfClient.communicate()
+                    self.logMessage(out)
+                    json_data = json.loads(out)
+                    self.logMessage("Bandwidth={}".format(json_data["end"]["sum"]["bits_per_second"]))
+                    self.logMessage("Loss={}".format(json_data["end"]["sum"]["lost_percent"]))
                 except Exception as e:
                     self.logMessage('monitor_network_resources: Exception was of type: %s' % (str(type(e))))
                     self.logMessage('monitor_network_resources: Exception : %s' % (str(e)))
