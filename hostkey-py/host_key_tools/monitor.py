@@ -4,6 +4,10 @@ import socket
 import json
 from kafka import *
 from ssl import create_default_context, Purpose
+import subprocess
+
+from host_key_tools.comet_common_iface import CometInterface
+
 
 def _create_ssl_context(cafile=None, capath=None, cadata=None,
                        certfile=None, keyfile=None, password=None,
@@ -70,13 +74,17 @@ def _create_ssl_context(cafile=None, capath=None, cadata=None,
 
 class ResourceMonitor():
 
-    def __init__(self, topic, kafkaHost='localhost:9092', log=None):
+    def __init__(self, workflowId, readToken, cometHost, topic, kafkaHost='localhost:9092', log=None):
+        self.cometHost = cometHost
+        self.readToken = readToken
+        self.workflowId = workflowId
         self._kafkHost = kafkaHost
         self._topic = topic
         self._log = log
         self._ssl_cafile = '/var/private/ssl/ca.crt'
         self._ssl_certfile = '/var/private/ssl/client.pem'
         self._ssl_keyfile = '/var/private/ssl/key.pem'
+        self.rId = socket.gethostname()
 
     def logMessage(self, message):
         if self._log is None:
@@ -121,6 +129,7 @@ class ResourceMonitor():
             return _producer
 
     def monitorAndSend(self):
+        self.monitor_network_resources()
         producer = self.connect_kafka_producer(self._kafkHost)
         if producer is not None:
             self.publish_message(producer, self._topic + socket.gethostname(), str(self.getResources()))
@@ -150,3 +159,61 @@ class ResourceMonitor():
         context.check_hostname = False
         context.verify_mode = False
         return context
+
+    def monitor_network_resources(self):
+        comet = CometInterface(self.cometHost, None, None, None, self.log)
+        section = "hostsall"
+        resp = comet.invokeRoundRobinApi('enumerate_families', self.workflowId, None, self.readToken, None, section, None)
+
+        if resp.status_code != 200:
+            self.logMessage("monitor_network_resources: Failure occurred in enumerating family from comet" + section)
+            return
+
+        localIP = None
+        if resp.json()["value"] and resp.json()["value"]["entries"]:
+            for e in resp.json()["value"]["entries"]:
+                if "key" not in e:
+                    continue
+                if e["key"] == self.rId and e["value"] != "\"\"":
+                    try:
+                        hosts = json.loads(json.loads(e["value"])["val_"])
+                        for h in hosts:
+                            if h["ip"] != "":
+                                localIP = h["ip"]
+                                break
+                    except Exception as e:
+                        self.logMessage('monitor_network_resources: Exception was of type: %s' % (str(type(e))))
+                        self.logMessage('monitor_network_resources: Exception : %s' % (str(e)))
+
+        if localIP is None:
+            return
+
+        # Start IPerf
+        iperServer = subprocess.Popen(['iperf3', '-s', localIP], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        if resp.json()["value"] and resp.json()["value"]["entries"]:
+            for e in resp.json()["value"]["entries"]:
+                if "key" not in e:
+                    continue
+                if e["key"] == self.rId:
+                    continue
+
+                self.logMessage("monitor_network_resources: processing host" + e["key"])
+                if e["value"] == "\"\"":
+                    continue
+                try:
+                    hosts = json.loads(json.loads(e["value"])["val_"])
+                    for h in hosts:
+                        if h["ip"] != "":
+                            iperfClient = subprocess.Popen(
+                                ['ssh', '-t', 'root@' + 'e["key"]', 'iperf3', '-c', localIP, '-u', '-b', '10g', '-J'],
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                            out, err = iperfClient.communicate()
+                            json_data = json.loads(out)
+                            self.logMessage("Bandwidth={}".format(json_data["end"]["sum"]["bits_per_second"]))
+                            self.logMessage("Loss={}".format(json_data["end"]["sum"]["lost_percent"]))
+                except Exception as e:
+                    self.logMessage('monitor_network_resources: Exception was of type: %s' % (str(type(e))))
+                    self.logMessage('monitor_network_resources: Exception : %s' % (str(e)))
+        self.logMessage("Terminate server iPerm")
+        iperServer.terminate()

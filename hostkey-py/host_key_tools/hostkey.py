@@ -430,7 +430,7 @@ class HostNamePubKeyCustomizer():
 
     def monitorResources(self):
         if self.kafkahost is not None:
-            mon=ResourceMonitor(self.kafkaTopic, self.kafkahost, self.log)
+            mon=ResourceMonitor(self.sliceId, self.cometHost, self.readToken, self.kafkaTopic, self.kafkahost, self.log)
             mon.monitorAndSend()
         else:
             self.monitorAndSendToComet()
