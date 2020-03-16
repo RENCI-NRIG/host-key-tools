@@ -453,7 +453,7 @@ class HostNamePubKeyCustomizer():
                 self.log.exception(('Caught exception in daemon loop; ' +
                                     'backtrace follows.'))
                 self.log.error('Exception was of type: %s' % (str(type(e))))
-            time.sleep(10)
+            time.sleep(60)
 
     def cleanup(self):
         if self.kafkahost is not None:

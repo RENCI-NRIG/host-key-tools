@@ -100,9 +100,9 @@ class ResourceMonitor():
         resources["idlecpu"] = cpuUsage["idle"]
         resources["memoryused"] = memUsage["percent"]
         resources["diskused"] = diskUsage["percent"]
-        nw_usage = self.monitor_network_resources()
-        if len(nw_usage) != 0:
-            resources["network"] = nw_usage
+        #nw_usage = self.monitor_network_resources()
+        #if len(nw_usage) != 0:
+        #    resources["network"] = nw_usage
         return (json.dumps(resources))
 
     def publish_message(self, producer_instance, topic_name, value):
