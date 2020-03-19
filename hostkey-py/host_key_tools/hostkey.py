@@ -435,6 +435,12 @@ class HostNamePubKeyCustomizer():
         else:
             self.monitorAndSendToComet()
 
+    def pushNodeExporterInfoToMonitoring(self):
+        if self.kafkahost is not None:
+            mon=ResourceMonitor(self.sliceId, self.cometHost, self.readToken, self.kafkaTopic, self.kafkahost, self.log)
+            node_exporter_url = self.ip + ":9100"
+            mon.setupMonitoring(node_exporter_url)
+
     def run(self):
         while True:
             try:

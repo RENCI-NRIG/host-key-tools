@@ -162,6 +162,13 @@ class ResourceMonitor():
         context.verify_mode = False
         return context
 
+    def setupMonitoring(self, node_exporter_url):
+        producer = self.connect_kafka_producer(self._kafkHost)
+        if producer is not None:
+            self.publish_message(producer, self._topic, node_exporter_url)
+        else:
+            self.logMessage('Unable to get a producer')
+
     def monitor_network_resources(self):
         nw_usage = {}
         comet = CometInterface(self.cometHost, None, None, None, self._log)
