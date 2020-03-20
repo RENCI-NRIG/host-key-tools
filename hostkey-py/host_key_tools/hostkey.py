@@ -450,7 +450,8 @@ class HostNamePubKeyCustomizer():
                 self.updatePubKeysToComet()
                 self.updatePubKeysFromComet()
                 self.updateHostsFromComet()
-                self.monitorResources()
+                if self.firstRun:
+                   self.pushNodeExporterInfoToMonitoring()
                 self.firstRun = False
             except KeyboardInterrupt:
                 self.log.error('Terminating on keyboard interrupt...')
