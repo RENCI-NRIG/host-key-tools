@@ -40,6 +40,7 @@ from host_key_tools import LOGGER
 class HostNamePubKeyCustomizer():
 
     def __init__(self, cometHost, sliceId, readToken, writeToken, rId, kafkahost, kafkaTopic):
+        self.firstRun = True
         self.cometHost = cometHost
         self.sliceId = sliceId
         self.readToken = readToken
