@@ -107,7 +107,7 @@ class ResourceMonitor():
 
     def publish_message(self, producer_instance, topic_name, key, value):
         try:
-            key_bytes = key..encode(encoding='utf-8')
+            key_bytes = key.encode(encoding='utf-8')
             value_bytes = value.encode(encoding='utf-8')
             producer_instance.send(topic_name, key=key_bytes, value=value_bytes)
             producer_instance.flush()
