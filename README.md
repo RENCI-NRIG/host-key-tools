@@ -1,11 +1,20 @@
 # host-key-tools
-python daemon to exchange hostnames and keys across nodes configured on COMET
+Mobius Host Key Tools is a python daemon which supports following functionality:
+- Pushes the node IP and Public Key to COMET
+- Polls the IPs and Public Keys of other nodes belonging to the same group as the node from COMET
+- Configures it's own /etc/hosts and /root/.ssh/authorized_keys
+- Pushes Nodes Public IP and Port on which Node Exporter is running to Mobius Monitoring Server via Kafka
 
-This software is intented to be install on VMs or Baremetal server for which a COMET context has been created.
-This software configures hostnames in /etc/hosts and shares publick keys between all the nodes configured in COMET context for the server.
-
+## Requirements
+```
+Kafka-python
+python-daemon==2.1.2
+psutil
+```
 ## Install host-key-tools
 ```
+git clone https://github.com/RENCI-NRIG/host-key-tools.git 
+cd host-key-tools/hostkey-py/
 python setup.py install
 ```
 
@@ -24,6 +33,10 @@ Options:
   -w WRITETOKEN, --writeToken=WRITETOKEN
                         Write Token
   -i ID, --id=ID        id
+  -k kafkahost, --kafkahost=kafkahost
+                        kafkahost
+  -t kafkatopic, --kafkatopic=kafkatopic
+                        kafkatopic
 ```
 
 ## Verify hostkey daemon is running
