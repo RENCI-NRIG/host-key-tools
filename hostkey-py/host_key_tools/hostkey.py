@@ -39,12 +39,13 @@ from host_key_tools import LOGGER
 
 class HostNamePubKeyCustomizer():
 
-    def __init__(self, cometHost, sliceId, readToken, writeToken, rId, kafkahost, kafkaTopic):
+    def __init__(self, cometHost, sliceId, readToken, writeToken, rId, kafkahost, kafkaTopic, family):
         self.firstRun = True
         self.cometHost = cometHost
         self.sliceId = sliceId
         self.readToken = readToken
         self.writeToken = writeToken
+        self.family = family
         if rId is None:
             rId = socket.gethostname()
         self.rId = rId
@@ -150,7 +151,7 @@ class HostNamePubKeyCustomizer():
         try:
             self.log.debug("Updating hosts locally")
 
-            section = "hostsall"
+            section = "hosts" + self.family
             newHosts = []
             comet = CometInterface(self.cometHost, None, None, None, self.log)
             self.log.debug("Processing section " + section)
@@ -252,7 +253,7 @@ class HostNamePubKeyCustomizer():
                 return
             startStr = '### BEGIN ' + self.neucaPubKeysStr
             endStr = '### END ' + self.neucaPubKeysStr
-            section = "pubkeysall"
+            section = "pubkeys" + self.family
             newKeys = []
             comet = CometInterface(self.cometHost, None, None, None, self.log)
             self.log.debug("Processing section " + section)
@@ -289,7 +290,7 @@ class HostNamePubKeyCustomizer():
             self.log.debug("Updating PubKeys in comet")
             if self.sliceId is not None and self.rId is not None and self.readToken is not None and self.writeToken is not None:
                 checker = None
-                section = "pubkeysall"
+                section = "pubkeys" + self.family
                 comet = CometInterface(self.cometHost, None, None, None, self.log)
                 self.log.debug("Processing section " + section)
                 keys = self.getCometData(section)
@@ -337,7 +338,7 @@ class HostNamePubKeyCustomizer():
             self.log.debug("Updating Hosts in comet")
             if self.sliceId is not None and self.rId is not None and self.readToken is not None and self.writeToken is not None:
                 checker = None
-                section = "hostsall"
+                section = "hosts" + self.family
                 comet = CometInterface(self.cometHost, None, None, None, self.log)
                 self.log.debug("Processing section " + section)
                 hosts = self.getCometData(section)
@@ -500,6 +501,14 @@ def main():
         help='Write Token'
     )
     parser.add_option(
+        '-f',
+        '--cometFamily',
+        dest='cometFamily',
+        type = str,
+        default = 'all',
+        help='Comet Family Suffix'
+    )
+    parser.add_option(
         '-i',
         '--id',
         dest='id',
@@ -551,7 +560,7 @@ def main():
     log = logging.getLogger(LOGGER)
     log.setLevel('DEBUG')
 
-    app = HostNamePubKeyCustomizer(options.cometHost, options.sliceId, options.readToken, options.writeToken, options.id, options.kafkahost, options.kafkatopic)
+    app = HostNamePubKeyCustomizer(options.cometHost, options.sliceId, options.readToken, options.writeToken, options.id, options.kafkahost, options.kafkatopic, options.cometFamily)
     daemon_runner = runner.DaemonRunner(app)
 
     try:
