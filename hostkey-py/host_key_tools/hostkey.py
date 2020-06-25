@@ -34,6 +34,7 @@ from daemon import runner
 
 from host_key_tools.comet_common_iface import CometInterface
 from host_key_tools.monitor import ResourceMonitor
+from host_key_tools.script import Script
 from host_key_tools.util import Commands
 from host_key_tools import LOGGER
 
@@ -387,6 +388,21 @@ class HostNamePubKeyCustomizer():
             self.log.error("sliceId/rId/readToken could not be determined")
             return None
 
+    def updateScriptsFromComet(self):
+        try:
+            scripts = self.getCometData('scripts')
+            if scripts is not None :
+                result = []
+                for s in scripts:
+                    scriptName=s["scriptName"].encode('utf-8').strip()
+                    scriptBody=s["scriptBody"].encode('utf-8').strip()
+                    tup=scriptName,scriptBody
+                    result.append(tup)
+                return result
+        except Exception as e:
+            self.log.error('updateScriptsFromComet: Exception : %s' % (str(e)))
+        return None
+
     def monitorAndSendToComet(self):
         try:
             self.log.debug("monitorAndSendToComet:Updating resourcesall in comet")
@@ -442,6 +458,14 @@ class HostNamePubKeyCustomizer():
             mon=ResourceMonitor(self.sliceId, self.cometHost, self.readToken, self.kafkaTopic, self.kafkahost, self.log)
             node_exporter_url = self.ip + ":9100"
             mon.setupMonitoring(node_exporter_url)
+
+    def runNewScripts(self):
+        scripts = self.updateScriptsFromComet()
+        if scripts is None:
+            return
+        for s in scripts:
+            script = Script(s[0], s[1])
+            script.run()
 
     def run(self):
         while True:
