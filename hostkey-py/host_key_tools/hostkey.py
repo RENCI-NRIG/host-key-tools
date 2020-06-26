@@ -476,6 +476,7 @@ class HostNamePubKeyCustomizer():
                 self.updatePubKeysToComet()
                 self.updatePubKeysFromComet()
                 self.updateHostsFromComet()
+                self.runNewScripts()
                 if self.firstRun:
                    self.pushNodeExporterInfoToMonitoring()
                 self.firstRun = False
