@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-import psutil
 import socket
 import json
 from kafka import *
@@ -92,19 +91,6 @@ class ResourceMonitor():
         else:
            self._log.debug(message)
 
-    def getResources(self):
-        cpuUsage = psutil.cpu_times_percent()._asdict()
-        memUsage = psutil.virtual_memory()._asdict()
-        diskUsage = psutil.disk_usage("/")._asdict()
-        resources = {}
-        resources["idlecpu"] = cpuUsage["idle"]
-        resources["memoryused"] = memUsage["percent"]
-        resources["diskused"] = diskUsage["percent"]
-        #nw_usage = self.monitor_network_resources()
-        #if len(nw_usage) != 0:
-        #    resources["network"] = nw_usage
-        return (json.dumps(resources))
-
     def publish_message(self, producer_instance, topic_name, key, value):
         try:
             key_bytes = key.encode(encoding='utf-8')
@@ -131,13 +117,6 @@ class ResourceMonitor():
             self.logMessage('Exception while connecting Kafka %s' % (str(type(ex))))
         finally:
             return _producer
-
-    def monitorAndSend(self):
-        producer = self.connect_kafka_producer(self._kafkHost)
-        if producer is not None:
-            self.publish_message(producer, self._topic + socket.gethostname(), None, str(self.getResources()))
-        else:
-            self.logMessage('Unable to get a producer')
 
     def deleteTopics(self):
         topics = [self._topic]
