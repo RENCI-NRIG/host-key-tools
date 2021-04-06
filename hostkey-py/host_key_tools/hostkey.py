@@ -155,7 +155,8 @@ class HostNamePubKeyCustomizer():
             newHosts = []
             comet = CometInterface(self.cometHost, None, None, None, self.log)
             self.log.debug("Processing section " + section)
-            resp = comet.invokeRoundRobinApi('enumerate_families', self.sliceId, None, self.readToken, None, section, None)
+            resp = comet.invokeRoundRobinApi('enumerate_families', self.sliceId, None, self.readToken, None,
+                                             section, None)
 
             if resp.status_code != 200:
                 self.log.error("Failure occurred in enumerating family from comet" + section)
@@ -257,9 +258,10 @@ class HostNamePubKeyCustomizer():
             newKeys = []
             comet = CometInterface(self.cometHost, None, None, None, self.log)
             self.log.debug("Processing section " + section)
-            resp = comet.invokeRoundRobinApi('enumerate_families', self.sliceId, None, self.readToken, None, section, None)
+            resp = comet.invokeRoundRobinApi('enumerate_families', self.sliceId, None, self.readToken, None,
+                                             section, None)
             if resp.status_code != 200:
-                self.log.error("Failure occured in enumerating family from comet" + section)
+                self.log.error("Failure occurred in enumerating family from comet" + section)
                 return
             if resp.json()["value"] and resp.json()["value"]["entries"]:
                 for e in resp.json()["value"]["entries"]:
@@ -284,11 +286,65 @@ class HostNamePubKeyCustomizer():
             self.log.error('updatePubKeysFromComet: Exception was of type: %s' % (str(type(e))))
             self.log.error('updatePubKeysFromComet: Exception : %s' % (str(e)))
 
+    def updateTokensFromComet(self):
+        try:
+            self.log.debug("Updating tokens locally")
+
+            if os.path.exists("/home/worker/joined"):
+                self.log.debug("Nothing to do!")
+                return
+
+            if self.sliceId is None or self.readToken is None or self.writeToken is None:
+                return
+            section = "tokens" + self.family
+            keadm_token = None
+            core_ip = None
+            comet = CometInterface(self.cometHost, None, None, None, self.log)
+            self.log.debug("Processing section " + section)
+            resp = comet.invokeRoundRobinApi('enumerate_families', self.sliceId, None, self.readToken, None,
+                                             section, None)
+            if resp.status_code != 200:
+                self.log.error("Failure occurred in enumerating family from comet" + section)
+                return
+            if resp.json()["value"] and resp.json()["value"]["entries"]:
+                for e in resp.json()["value"]["entries"]:
+                    if e["key"] == self.rId:
+                        continue
+                    self.log.debug("processing " + e["key"])
+                    if e["value"] == "\"\"":
+                        continue
+                    try:
+                        keys = json.loads(json.loads(e["value"])["val_"])
+                        for k in keys:
+                            if k["keadmToken"] == "":
+                                continue
+                            keadm_token = k["keadmToken"]
+                            core_ip = k["ip"]
+                    except Exception as e:
+                        self.log.error('updatePubKeysFromComet: Exception was of type: %s' % (str(type(e))))
+                        self.log.error('updatePubKeysFromComet: Exception : %s' % (str(e)))
+            if keadm_token is not None and core_ip is not None:
+                cmd = [
+                    "/bin/su", "-", "worker", "-c",
+                    f"sudo /home/worker/bin/keadm join --cloudcore-ipport={core_ip} --token={keadm_token}"]
+                FNULL = open(os.devnull, 'w')
+                rtncode = subprocess.call(cmd, stdout=FNULL)
+                if rtncode == 0:
+                    self.log.debug("Joined the KEADM")
+                    cmd = [
+                        "/bin/su", "-", "worker", "-c", "sudo touch /home/worker/joined"]
+                    FNULL = open(os.devnull, 'w')
+                    rtncode = subprocess.call(cmd, stdout=FNULL)
+
+        except Exception as e:
+            self.log.error('updatePubKeysFromComet: Exception was of type: %s' % (str(type(e))))
+            self.log.error('updatePubKeysFromComet: Exception : %s' % (str(e)))
 
     def updatePubKeysToComet(self):
         try:
             self.log.debug("Updating PubKeys in comet")
-            if self.sliceId is not None and self.rId is not None and self.readToken is not None and self.writeToken is not None:
+            if self.sliceId is not None and self.rId is not None and self.readToken is not None and \
+                    self.writeToken is not None:
                 checker = None
                 section = "pubkeys" + self.family
                 comet = CometInterface(self.cometHost, None, None, None, self.log)
@@ -300,7 +356,7 @@ class HostNamePubKeyCustomizer():
                 for k in keys:
                     if k["publicKey"] == "" :
                         rtncode = 1
-                        if os.path.exists(self.publicKey) :
+                        if os.path.exists(self.publicKey):
                             self.log.debug("Public Key already exists for root user")
                             rtncode = 0
                         else :
@@ -324,9 +380,56 @@ class HostNamePubKeyCustomizer():
                     val["val_"] = json.dumps(keys)
                     newVal = json.dumps(val)
                     self.log.debug("Updating " + section + "=" + newVal)
-                    resp = comet.invokeRoundRobinApi('update_family', self.sliceId, self.rId, self.readToken, self.writeToken, section, json.loads(newVal))
+                    resp = comet.invokeRoundRobinApi('update_family', self.sliceId, self.rId, self.readToken,
+                                                     self.writeToken, section, json.loads(newVal))
                     if resp.status_code != 200:
-                        self.log.error("Failure occured in updating pubkeys to comet" + section)
+                        self.log.error("Failure occurred in updating pubkeys to comet" + section)
+                else :
+                    self.log.debug("Nothing to update")
+        except Exception as e:
+            self.log.error('updatePubKeysToComet: Exception was of type: %s' % (str(type(e))))
+            self.log.error('updatePubKeysToComet: Exception : %s' % (str(e)))
+
+    def updateTokensToComet(self):
+        try:
+            self.log.debug("Updating Tokens in comet")
+            if self.sliceId is not None and self.rId is not None and self.readToken is not None and \
+                    self.writeToken is not None:
+                checker = None
+                section = "tokens" + self.family
+                comet = CometInterface(self.cometHost, None, None, None, self.log)
+                self.log.debug("Processing section " + section)
+                keys = self.getCometData(section)
+                if keys is None:
+                    self.log.debug("empty section " + section)
+                    return
+                for k in keys:
+                    if k["keadmToken"] == "" and "master" in self.hostName:
+                        rtncode = 1
+                        self.log.debug("Fetching keadm token")
+                        cmd = [
+                        "/bin/su", "-", "core", "-c",
+                            "sudo /home/core/bin/keadm gettoken --kube-config=/home/core/.kube/config > /tmp/token"]
+                        FNULL = open(os.devnull, 'w')
+                        rtncode = subprocess.call(cmd, stdout=FNULL)
+                        if rtncode == 0:
+                            self.log.debug("Pushing keadm token from master to Comet")
+                            f = open("/tmp/token", 'r')
+                            keyVal= f.read()
+                            f.close()
+                            k["keadmToken"] = keyVal
+                            checker = True
+                        else:
+                            self.log.error("Failed to fetch Keadm token for master")
+                if checker:
+                    val = {}
+                    val["val_"] = json.dumps(keys)
+                    newVal = json.dumps(val)
+                    self.log.debug("Updating " + section + "=" + newVal)
+                    resp = comet.invokeRoundRobinApi('update_family', self.sliceId, self.rId, self.readToken,
+                                                     self.writeToken, section, json.loads(newVal))
+                    if resp.status_code != 200:
+                        self.log.error("Failure occurred in updating tokens to comet" + section)
                 else :
                     self.log.debug("Nothing to update")
         except Exception as e:
@@ -336,7 +439,8 @@ class HostNamePubKeyCustomizer():
     def updateHostsToComet(self):
         try:
             self.log.debug("Updating Hosts in comet")
-            if self.sliceId is not None and self.rId is not None and self.readToken is not None and self.writeToken is not None:
+            if self.sliceId is not None and self.rId is not None and self.readToken is not None and \
+                    self.writeToken is not None:
                 checker = None
                 section = "hosts" + self.family
                 comet = CometInterface(self.cometHost, None, None, None, self.log)
@@ -357,9 +461,10 @@ class HostNamePubKeyCustomizer():
                     val["val_"] = json.dumps(hosts)
                     newVal = json.dumps(val)
                     self.log.debug("Updating " + section + "=" + newVal)
-                    resp = comet.invokeRoundRobinApi('update_family', self.sliceId, self.rId, self.readToken, self.writeToken, section, json.loads(newVal))
+                    resp = comet.invokeRoundRobinApi('update_family', self.sliceId, self.rId, self.readToken,
+                                                     self.writeToken, section, json.loads(newVal))
                     if resp.status_code != 200:
-                        self.log.debug("Failure occured in updating hosts to comet" + section)
+                        self.log.debug("Failure occurred in updating hosts to comet" + section)
                 else :
                     self.log.debug("Nothing to update")
         except Exception as e:
@@ -371,10 +476,10 @@ class HostNamePubKeyCustomizer():
             comet = CometInterface(self.cometHost, None, None, None, self.log)
             resp = comet.invokeRoundRobinApi('get_family', self.sliceId, self.rId, self.readToken, None, section, None)
             if resp.status_code != 200:
-                self.log.error("Failure occured in fetching family from comet" + section)
+                self.log.error("Failure occurred in fetching family from comet" + section)
                 return None
             if resp.json()["value"].get("error") :
-                self.log.error("Error occured in fetching family from comet" + section + resp.json()["value"]["error"])
+                self.log.error("Error occurred in fetching family from comet" + section + resp.json()["value"]["error"])
                 return None
             elif resp.json()["value"] :
                 value = resp.json()["value"]["value"]
@@ -404,7 +509,8 @@ class HostNamePubKeyCustomizer():
 
     def pushNodeExporterInfoToMonitoring(self):
         if self.kafkahost is not None:
-            mon=ResourceMonitor(self.sliceId, self.cometHost, self.readToken, self.kafkaTopic, kafkaHost=self.kafkahost, log=self.log)
+            mon=ResourceMonitor(self.sliceId, self.cometHost, self.readToken, self.kafkaTopic,
+                                kafkaHost=self.kafkahost, log=self.log)
             node_exporter_url = self.ip + ":9100"
             mon.setupMonitoring(node_exporter_url)
 
@@ -423,8 +529,10 @@ class HostNamePubKeyCustomizer():
                 self.log.debug('Polling')
                 self.updateHostsToComet()
                 self.updatePubKeysToComet()
+                self.updateTokensToComet()
                 self.updatePubKeysFromComet()
                 self.updateHostsFromComet()
+                self.updateTokensFromComet()
                 self.runNewScripts()
                 if self.firstRun:
                    self.pushNodeExporterInfoToMonitoring()
@@ -529,12 +637,14 @@ def main():
     else:
         logfd.close()
 
-    log_format = '%(asctime)s - %(levelname)s - %(message)s'
+    log_format = \
+        '%(asctime)s - %(name)s - {%(filename)s:%(lineno)d} - [%(threadName)s] - %(levelname)s - %(message)s'
     logging.basicConfig(format=log_format, filename=initial_log_location)
     log = logging.getLogger(LOGGER)
     log.setLevel('DEBUG')
 
-    app = HostNamePubKeyCustomizer(options.cometHost, options.sliceId, options.readToken, options.writeToken, options.id, options.kafkahost, options.kafkatopic, options.cometFamily)
+    app = HostNamePubKeyCustomizer(options.cometHost, options.sliceId, options.readToken, options.writeToken,
+                                   options.id, options.kafkahost, options.kafkatopic, options.cometFamily)
     daemon_runner = runner.DaemonRunner(app)
 
     try:
