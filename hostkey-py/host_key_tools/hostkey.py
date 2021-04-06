@@ -326,7 +326,7 @@ class HostNamePubKeyCustomizer():
             if keadm_token is not None and core_ip is not None:
                 cmd = [
                     "/bin/su", "-", "worker", "-c",
-                    f"sudo /home/worker/bin/keadm join --cloudcore-ipport={core_ip} --token={keadm_token}"]
+                    "sudo /home/worker/bin/keadm join --cloudcore-ipport={} --token={}".format(core_ip, keadm_token)]
                 FNULL = open(os.devnull, 'w')
                 rtncode = subprocess.call(cmd, stdout=FNULL)
                 if rtncode == 0:
