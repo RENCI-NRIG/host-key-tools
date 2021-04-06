@@ -126,7 +126,7 @@ class HostNamePubKeyCustomizer():
                 del hostsEntries[neucaStartEntry:neucaEndEntry+1]
                 modified = True
             else:
-                self.log.debug("__updateHostsFileWithCometHosts: Nothing to do")
+                self.log.debug("Nothing to do")
         else:
             modified = True
 
@@ -141,10 +141,9 @@ class HostNamePubKeyCustomizer():
                 for line in hostsEntries:
                     fd.write(line)
             except Exception as e:
-                self.log.error('__updateHostsFileWithCometHosts: Error writing modifications to ' +
-                               self.hostsFile)
-                self.log.error('__updateHostsFileWithCometHosts: Exception was of type: %s' % (str(type(e))))
-                self.log.error('__updateHostsFileWithCometHosts: Exception : %s' % (str(e)))
+                self.log.error('Error writing modifications to ' + self.hostsFile)
+                self.log.error('Exception was of type: %s' % (str(type(e))))
+                self.log.error('Exception : %s' % (str(e)))
         fd.close()
 
     def updateHostsFromComet(self):
@@ -181,15 +180,15 @@ class HostNamePubKeyCustomizer():
                             newHostsEntry = newHostsEntry.replace('/','-')
                             newHosts.append(str(newHostsEntry))
                     except Exception as e:
-                        self.log.error('updateHostsFromComet: Exception was of type: %s' % (str(type(e))))
-                        self.log.error('updateHostsFromComet: Exception : %s' % (str(e)))
+                        self.log.error('Exception was of type: %s' % (str(type(e))))
+                        self.log.error('Exception : %s' % (str(e)))
 
             if newHosts is not None:
                 newHosts.sort()
                 self.__updateHostsFileWithCometHosts(newHosts)
         except Exception as e:
-            self.log.error('updateHostsFromComet: Exception was of type: %s' % (str(type(e))))
-            self.log.error('updateHostsFromComet: Exception : %s' % (str(e)))
+            self.log.error('Exception was of type: %s' % (str(type(e))))
+            self.log.error('Exception : %s' % (str(e)))
 
     def __updateAuthorizedKeysFile(self, newKeys, startStr, endStr, keysFile):
         """
@@ -200,8 +199,7 @@ class HostNamePubKeyCustomizer():
         try:
             fd = open(keysFile, 'a+')
         except:
-            self.log.error('__updateAuthorizedKeysFile: Unable to open ' + keysFile +
-                           ' for modifications!')
+            self.log.error('Unable to open ' + keysFile + ' for modifications!')
             return
 
         fd.seek(0)
@@ -225,7 +223,7 @@ class HostNamePubKeyCustomizer():
                 del keysEntries[neucaStartEntry:neucaEndEntry+1]
                 modified = True
             else:
-                self.log.debug("__updateAuthorizedKeysFile: Nothing to do")
+                self.log.debug("Nothing to do")
         else:
             modified = True
 
@@ -240,10 +238,9 @@ class HostNamePubKeyCustomizer():
                 for line in keysEntries:
                     fd.write(line)
             except Exception as e:
-                self.log.error('__updateAuthorizedKeysFile: Error writing modifications to ' +
-                               self.hostsFile)
-                self.log.error('__updateAuthorizedKeysFile: Exception was of type: %s' % (str(type(e))))
-                self.log.error('__updateAuthorizedKeysFile: Exception : %s' % (str(e)))
+                self.log.error('Error writing modifications to ' + self.hostsFile)
+                self.log.error('Exception was of type: %s' % (str(type(e))))
+                self.log.error('Exception : %s' % (str(e)))
         fd.close()
 
     def updatePubKeysFromComet(self):
@@ -277,14 +274,14 @@ class HostNamePubKeyCustomizer():
                                 continue
                             newKeys.append(k["publicKey"])
                     except Exception as e:
-                        self.log.error('updatePubKeysFromComet: Exception was of type: %s' % (str(type(e))))
-                        self.log.error('updatePubKeysFromComet: Exception : %s' % (str(e)))
+                        self.log.error('Exception was of type: %s' % (str(type(e))))
+                        self.log.error('Exception : %s' % (str(e)))
             if newKeys is not None:
                 newKeys.sort()
                 self.__updateAuthorizedKeysFile(newKeys, startStr, endStr, self.keysFile)
         except Exception as e:
-            self.log.error('updatePubKeysFromComet: Exception was of type: %s' % (str(type(e))))
-            self.log.error('updatePubKeysFromComet: Exception : %s' % (str(e)))
+            self.log.error('Exception was of type: %s' % (str(type(e))))
+            self.log.error('Exception : %s' % (str(e)))
 
     def updateTokensFromComet(self):
         try:
@@ -310,19 +307,17 @@ class HostNamePubKeyCustomizer():
                 for e in resp.json()["value"]["entries"]:
                     if e["key"] == self.rId:
                         continue
-                    self.log.debug("processing " + e["key"])
+                    self.log.debug("processing node: {} value: {}".format(e["key"], e["value"]))
                     if e["value"] == "\"\"":
                         continue
                     try:
-                        keys = json.loads(json.loads(e["value"])["val_"])
-                        for k in keys:
-                            if k["keadmToken"] == "":
-                                continue
-                            keadm_token = k["keadmToken"]
-                            core_ip = k["ip"]
+                        token_json = json.loads(json.loads(e["value"]))
+                        keadm_token = token_json.get("keadmToken", None)
+                        core_ip = token_json.get("ip", None)
+                        self.log.debug("Token: {} IP: {}".format(keadm_token, core_ip))
                     except Exception as e:
-                        self.log.error('updatePubKeysFromComet: Exception was of type: %s' % (str(type(e))))
-                        self.log.error('updatePubKeysFromComet: Exception : %s' % (str(e)))
+                        self.log.error('Exception was of type: %s' % (str(type(e))))
+                        self.log.error('Exception : %s' % (str(e)))
             if keadm_token is not None and core_ip is not None:
                 cmd = [
                     "/bin/su", "-", "worker", "-c",
@@ -337,8 +332,8 @@ class HostNamePubKeyCustomizer():
                     rtncode = subprocess.call(cmd, stdout=FNULL)
 
         except Exception as e:
-            self.log.error('updatePubKeysFromComet: Exception was of type: %s' % (str(type(e))))
-            self.log.error('updatePubKeysFromComet: Exception : %s' % (str(e)))
+            self.log.error('Exception was of type: %s' % (str(type(e))))
+            self.log.error('Exception : %s' % (str(e)))
 
     def updatePubKeysToComet(self):
         try:
@@ -354,7 +349,7 @@ class HostNamePubKeyCustomizer():
                     self.log.debug("empty section " + section)
                     return
                 for k in keys:
-                    if k["publicKey"] == "" :
+                    if k["publicKey"] == "":
                         rtncode = 1
                         if os.path.exists(self.publicKey):
                             self.log.debug("Public Key already exists for root user")
@@ -387,8 +382,8 @@ class HostNamePubKeyCustomizer():
                 else :
                     self.log.debug("Nothing to update")
         except Exception as e:
-            self.log.error('updatePubKeysToComet: Exception was of type: %s' % (str(type(e))))
-            self.log.error('updatePubKeysToComet: Exception : %s' % (str(e)))
+            self.log.error('Exception was of type: %s' % (str(type(e))))
+            self.log.error('Exception : %s' % (str(e)))
 
     def updateTokensToComet(self):
         try:
@@ -433,8 +428,8 @@ class HostNamePubKeyCustomizer():
                 else :
                     self.log.debug("Nothing to update")
         except Exception as e:
-            self.log.error('updatePubKeysToComet: Exception was of type: %s' % (str(type(e))))
-            self.log.error('updatePubKeysToComet: Exception : %s' % (str(e)))
+            self.log.error('Exception was of type: %s' % (str(type(e))))
+            self.log.error('Exception : %s' % (str(e)))
 
     def updateHostsToComet(self):
         try:
@@ -468,8 +463,8 @@ class HostNamePubKeyCustomizer():
                 else :
                     self.log.debug("Nothing to update")
         except Exception as e:
-            self.log.error('updateHostsToComet: Exception was of type: %s' % (str(type(e))))
-            self.log.error('updateHostsToComet: Exception : %s' % (str(e)))
+            self.log.error('Exception was of type: %s' % (str(type(e))))
+            self.log.error('Exception : %s' % (str(e)))
 
     def getCometData(self, section):
         if self.sliceId is not None and self.rId is not None and self.readToken is not None:
@@ -504,7 +499,7 @@ class HostNamePubKeyCustomizer():
                     result.append(tup)
                 return result
         except Exception as e:
-            self.log.error('updateScriptsFromComet: Exception : %s' % (str(e)))
+            self.log.error('Exception : %s' % (str(e)))
         return None
 
     def pushNodeExporterInfoToMonitoring(self):
