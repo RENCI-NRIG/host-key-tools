@@ -1,2 +1,3 @@
-psutil
 Kafka-python
+python-daemon
+requests
