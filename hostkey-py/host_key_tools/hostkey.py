@@ -412,12 +412,12 @@ class HostNamePubKeyCustomizer():
                         f = open("/tmp/token", 'r')
                         keyVal= f.read()
                         f.close()
-                        token_info["keadmToken"] = keyVal
+                        token_info["keadmToken"] = keyVal.strip("\n")
                         checker = True
                     else:
                         self.log.error("Failed to fetch Keadm token for master")
                 if checker:
-                    self.log.debug("Updating " + section + "=" + token_info)
+                    self.log.debug("Updating " + section + "=" + str(token_info))
                     resp = comet.invokeRoundRobinApi('update_family', self.sliceId, self.rId, self.readToken,
                                                      self.writeToken, section, token_info)
                     if resp.status_code != 200:
