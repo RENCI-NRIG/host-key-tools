@@ -394,38 +394,35 @@ class HostNamePubKeyCustomizer():
                 section = "tokens" + self.family
                 comet = CometInterface(self.cometHost, None, None, None, self.log)
                 self.log.debug("Processing section " + section)
-                keys = self.getCometData(section)
-                if keys is None:
+                token_info = self.getCometData(section)
+                if token_info is None:
                     self.log.debug("empty section " + section)
                     return
-                for k in keys:
-                    if k["keadmToken"] == "" and "master" in self.hostName:
-                        rtncode = 1
-                        self.log.debug("Fetching keadm token")
-                        cmd = [
-                        "/bin/su", "-", "core", "-c",
-                            "sudo /home/core/bin/keadm gettoken --kube-config=/home/core/.kube/config > /tmp/token"]
-                        FNULL = open(os.devnull, 'w')
-                        rtncode = subprocess.call(cmd, stdout=FNULL)
-                        if rtncode == 0:
-                            self.log.debug("Pushing keadm token from master to Comet")
-                            f = open("/tmp/token", 'r')
-                            keyVal= f.read()
-                            f.close()
-                            k["keadmToken"] = keyVal
-                            checker = True
-                        else:
-                            self.log.error("Failed to fetch Keadm token for master")
+                self.log.debug("Processing section " + section + " token_info " + str(token_info))
+                if token_info["keadmToken"] == "" and "master" in self.hostName:
+                    rtncode = 1
+                    self.log.debug("Fetching keadm token")
+                    cmd = [
+                    "/bin/su", "-", "core", "-c",
+                        "sudo /home/core/bin/keadm gettoken --kube-config=/home/core/.kube/config > /tmp/token"]
+                    FNULL = open(os.devnull, 'w')
+                    rtncode = subprocess.call(cmd, stdout=FNULL)
+                    if rtncode == 0:
+                        self.log.debug("Pushing keadm token from master to Comet")
+                        f = open("/tmp/token", 'r')
+                        keyVal= f.read()
+                        f.close()
+                        token_info["keadmToken"] = keyVal
+                        checker = True
+                    else:
+                        self.log.error("Failed to fetch Keadm token for master")
                 if checker:
-                    val = {}
-                    val["val_"] = json.dumps(keys)
-                    newVal = json.dumps(val)
-                    self.log.debug("Updating " + section + "=" + newVal)
+                    self.log.debug("Updating " + section + "=" + token_info)
                     resp = comet.invokeRoundRobinApi('update_family', self.sliceId, self.rId, self.readToken,
-                                                     self.writeToken, section, json.loads(newVal))
+                                                     self.writeToken, section, token_info)
                     if resp.status_code != 200:
                         self.log.error("Failure occurred in updating tokens to comet" + section)
-                else :
+                else:
                     self.log.debug("Nothing to update")
         except Exception as e:
             self.log.error('Exception was of type: %s' % (str(type(e))))
