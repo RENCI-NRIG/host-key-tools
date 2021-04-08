@@ -17,25 +17,22 @@
 # Author: (Komal Thareja kthare10@renci.org)
 
 import os
-import re
 import socket
 import subprocess
 import time
-import glob
 import json
 import sys
-import string
 import logging
 import logging.handlers
 
 from optparse import OptionParser
 from daemon import runner
 
-from host_key_tools.comet_common_iface import CometInterface
-from host_key_tools.monitor import ResourceMonitor
-from host_key_tools.script import Script
-from host_key_tools.util import Commands
-from host_key_tools import LOGGER
+from .comet_common_iface import CometInterface
+from .monitor import ResourceMonitor
+from .script import Script
+from .util import Commands
+from . import LOGGER
 
 class HostNamePubKeyCustomizer():
 
@@ -54,10 +51,10 @@ class HostNamePubKeyCustomizer():
         self.hostsFile = '/etc/hosts'
         self.keysFile = '/root/.ssh/authorized_keys'
         self.publicKey = '/root/.ssh/id_rsa.pub'
-        self.neucaPubKeysStr = ('NEuca comet pubkeys modifications - ' +
-                    'DO NOT EDIT BETWEEN THESE LINES. ###\n')
-        self.neucaUserKeysStr = ('NEuca comet user keys modifications - ' +
-                    'DO NOT EDIT BETWEEN THESE LINES. ###\n')
+        self.neucaPubKeysStr = ('NEuca comet pubkeys modifications - '
+                                'DO NOT EDIT BETWEEN THESE LINES. ###\n')
+        self.neucaUserKeysStr = ('NEuca comet user keys modifications - '
+                                 'DO NOT EDIT BETWEEN THESE LINES. ###\n')
         self.stdin_path = '/dev/null'
         self.stdout_path = '/dev/null'
         self.stderr_path = '/dev/null'
@@ -92,7 +89,7 @@ class HostNamePubKeyCustomizer():
         """
         Maintains the comet entries added to /etc/hosts.
         """
-        neucaStr = ('NEuca comet modifications - ' +
+        neucaStr = ('NEuca comet modifications - '
                     'DO NOT EDIT BETWEEN THESE LINES. ###\n')
         startStr = '### BEGIN ' + neucaStr
         endStr = '### END ' + neucaStr
@@ -122,7 +119,7 @@ class HostNamePubKeyCustomizer():
             if neucaStartEntry+1 != neucaEndEntry :
                 existingHosts = hostsEntries[neucaStartEntry+1:neucaEndEntry]
                 existingHosts.sort()
-            if cmp(existingHosts, newHosts) :
+            if cmp(existingHosts, newHosts):
                 del hostsEntries[neucaStartEntry:neucaEndEntry+1]
                 modified = True
             else:
@@ -322,6 +319,8 @@ class HostNamePubKeyCustomizer():
                 cmd = [
                     "/bin/su", "-", "worker", "-c",
                     "sudo /home/worker/bin/keadm join --cloudcore-ipport={} --token={}".format(core_ip, keadm_token)]
+                self.log.debug("Joining the Kube Edge master")
+                self.log.debug("Running the cmd: {}".format(cmd))
                 FNULL = open(os.devnull, 'w')
                 rtncode = subprocess.call(cmd, stdout=FNULL)
                 if rtncode == 0:
