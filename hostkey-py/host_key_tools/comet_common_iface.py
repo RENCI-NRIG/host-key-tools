@@ -79,12 +79,13 @@ class CometInterface:
         if self._verify == False:
             response = requests.get((host + '/readScope'), headers=self._headers(), params=params, verify=False)
         else:
-            response = requests.get((host + '/readScope'), headers=self._headers(), params=params, cert= self._cert, verify=False)
-        self._log.debug ("get_family: Received Response Status Code: " + str(response.status_code))
+            response = requests.get((host + '/readScope'), headers=self._headers(), params=params, cert=self._cert,
+                                    verify=False)
+        self._log.debug("get_family: Received Response Status Code: " + str(response.status_code))
         if response.status_code == 200 :
-            self._log.debug ("get_family: Received Response Message: " + response.json()["message"])
-            self._log.debug ("get_family: Received Response Status: " + response.json()["status"])
-            self._log.debug ("get_family: Received Response Value: " + str(response.json()["value"]))
+            self._log.debug("get_family: Received Response Message: " + response.json()["message"])
+            self._log.debug("get_family: Received Response Status: " + response.json()["status"])
+            self._log.debug("get_family: Received Response Value: " + str(response.json()["value"]))
         return response
 
     @classmethod
@@ -96,12 +97,13 @@ class CometInterface:
             'readToken':readToken,
             'writeToken':writeToken
         }
-        response = requests.post((host +'/writeScope'), headers=self._headers(), params=params, cert= self._cert, verify=self._verify, json=value)
-        self._log.debug ("update_family: Received Response Status Code: " + str(response.status_code))
+        response = requests.post((host +'/writeScope'), headers=self._headers(), params=params, cert=self._cert,
+                                 verify=self._verify, json=value)
+        self._log.debug("update_family: Received Response Status Code: " + str(response.status_code))
         if response.status_code == 200 :
-            self._log.debug ("update_family: Received Response Message: " + response.json()["message"])
-            self._log.debug ("update_family: Received Response Status: " + response.json()["status"])
-            self._log.debug ("update_family: Received Response Value: " + str(response.json()["value"]))
+            self._log.debug("update_family: Received Response Message: " + response.json()["message"])
+            self._log.debug("update_family: Received Response Status: " + response.json()["status"])
+            self._log.debug("update_family: Received Response Value: " + str(response.json()["value"]))
         return response
 
     @classmethod
@@ -116,12 +118,13 @@ class CometInterface:
         if self._verify == False:
             response = requests.delete((host +'/deleteScope'), headers=self._headers(), params=params, verify=False)
         else:
-            response = requests.delete((host +'/deleteScope'), headers=self._headers(), params=params, cert= self._cert, verify=False)
-        self._log.debug ("delete_family: Received Response Status Code: " + str(response.status_code))
+            response = requests.delete((host +'/deleteScope'), headers=self._headers(), params=params,
+                                       cert=self._cert, verify=False)
+        self._log.debug("delete_family: Received Response Status Code: " + str(response.status_code))
         if response.status_code == 200 :
-            self._log.debug ("delete_family: Received Response Message: " + response.json()["message"])
-            self._log.debug ("delete_family: Received Response Status: " + response.json()["status"])
-            self._log.debug ("delete_family: Received Response Value: " + str(response.json()["value"]))
+            self._log.debug("delete_family: Received Response Message: " + response.json()["message"])
+            self._log.debug("delete_family: Received Response Status: " + response.json()["status"])
+            self._log.debug("delete_family: Received Response Value: " + str(response.json()["value"]))
         return response
 
     @classmethod
@@ -142,12 +145,13 @@ class CometInterface:
         if self._verify == False:
             response = requests.get((host +'/enumerateScope'), headers=self._headers(), params=params, verify=False)
         else:
-            response = requests.get((host +'/enumerateScope'), headers=self._headers(), params=params, cert= self._cert, verify=False)
-        self._log.debug ("enumerate_families: Received Response Status Code: " + str(response.status_code))
+            response = requests.get((host +'/enumerateScope'), headers=self._headers(), params=params,
+                                    cert=self._cert, verify=False)
+        self._log.debug("enumerate_families: Received Response Status Code: " + str(response.status_code))
         if response.status_code == 200 :
-            self._log.debug ("enumerate_families: Received Response Message: " + response.json()["message"])
-            self._log.debug ("enumerate_families: Received Response Status: " + response.json()["status"])
-            self._log.debug ("enumerate_families: Received Response Value: " + str(response.json()["value"]))
+            self._log.debug("enumerate_families: Received Response Message: " + response.json()["message"])
+            self._log.debug("enumerate_families: Received Response Status: " + response.json()["status"])
+            self._log.debug("enumerate_families: Received Response Value: " + str(response.json()["value"]))
         return response
 
     @classmethod
@@ -157,7 +161,8 @@ class CometInterface:
             raise CometException('delete_families: Cannot Enumerate Scope: ' + str(response.status_code))
         if response.json()["value"] and response.json()["value"]["entries"]:
             for key in response.json()["value"]["entries"]:
-                self._log.debug ("delete_families: Deleting Family: '" + key["family"] + "' SliceId: '" + sliceId + "' rId: '" + rId + "'")
+                self._log.debug("delete_families: Deleting Family: '" + key["family"] + "' SliceId: '" + sliceId +
+                                 "' rId: '" + rId + "'")
                 response = self.delete_family(host, sliceId, rId, readToken, writeToken, key["family"])
                 if response.status_code != 200:
                     self._log.debug('delete_families: Cannot Delete Family: ' + key["family"])

@@ -311,7 +311,7 @@ class HostNamePubKeyCustomizer():
                     if e["value"] == "\"\"":
                         continue
                     try:
-                        token_json = json.loads(json.loads(e["value"]))
+                        token_json = json.loads(e["value"])
                         keadm_token = token_json.get("keadmToken", None)
                         core_ip = token_json.get("ip", None)
                         self.log.debug("Token: {} IP: {}".format(keadm_token, core_ip))
@@ -473,13 +473,17 @@ class HostNamePubKeyCustomizer():
             if resp.status_code != 200:
                 self.log.error("Failure occurred in fetching family from comet" + section)
                 return None
-            if resp.json()["value"].get("error") :
+            if resp.json()["value"].get("error"):
                 self.log.error("Error occurred in fetching family from comet" + section + resp.json()["value"]["error"])
                 return None
-            elif resp.json()["value"] :
+            elif resp.json()["value"]:
                 value = resp.json()["value"]["value"]
-                if value is not None :
-                    secData = json.loads(json.loads(value)["val_"])
+                if value is not None:
+                    value_json = json.loads(value)
+                    if value_json.get("val_", None) is not None:
+                        secData = json.loads(value_json.get("val_"))
+                    else:
+                        secData = value_json
                     return secData
             else:
                 return None
