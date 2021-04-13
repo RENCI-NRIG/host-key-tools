@@ -524,10 +524,10 @@ class HostNamePubKeyCustomizer():
                 self.log.debug('Polling')
                 self.updateHostsToComet()
                 self.updatePubKeysToComet()
-                self.updateTokensToComet()
+                #self.updateTokensToComet()
                 self.updatePubKeysFromComet()
                 self.updateHostsFromComet()
-                self.updateTokensFromComet()
+                #self.updateTokensFromComet()
                 self.runNewScripts()
                 if self.firstRun:
                    self.pushNodeExporterInfoToMonitoring()
