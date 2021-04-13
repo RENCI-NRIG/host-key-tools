@@ -315,7 +315,7 @@ class HostNamePubKeyCustomizer():
                     except Exception as e:
                         self.log.error('Exception was of type: %s' % (str(type(e))))
                         self.log.error('Exception : %s' % (str(e)))
-            if keadm_token is not None and core_ip is not None:
+            if keadm_token is not None and core_ip is not None and keadm_token != "" and core_ip != "":
                 cmd = [
                     "/bin/su", "-", "worker", "-c",
                     "sudo /home/worker/bin/keadm join --cloudcore-ipport={} --token={}".format(core_ip, keadm_token)]
