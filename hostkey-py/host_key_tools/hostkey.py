@@ -318,7 +318,7 @@ class HostNamePubKeyCustomizer():
             if keadm_token is not None and core_ip is not None and keadm_token != "" and core_ip != "":
                 cmd = [
                     "/bin/su", "-", "worker", "-c",
-                    "sudo /home/worker/bin/keadm join --cloudcore-ipport={} --token={}".format(core_ip, keadm_token)]
+                    "sudo /home/worker/bin/keadm join --cloudcore-ipport={}:10000 --token={}".format(core_ip, keadm_token)]
                 self.log.debug("Joining the Kube Edge master")
                 self.log.debug("Running the cmd: {}".format(cmd))
                 FNULL = open(os.devnull, 'w')
@@ -524,10 +524,10 @@ class HostNamePubKeyCustomizer():
                 self.log.debug('Polling')
                 self.updateHostsToComet()
                 self.updatePubKeysToComet()
-                #self.updateTokensToComet()
+                self.updateTokensToComet()
                 self.updatePubKeysFromComet()
                 self.updateHostsFromComet()
-                #self.updateTokensFromComet()
+                self.updateTokensFromComet()
                 self.runNewScripts()
                 if self.firstRun:
                    self.pushNodeExporterInfoToMonitoring()
