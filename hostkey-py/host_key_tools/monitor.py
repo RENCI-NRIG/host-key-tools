@@ -83,7 +83,7 @@ class ResourceMonitor():
         self._ssl_cafile = '/var/private/ssl/ca.crt'
         self._ssl_certfile = '/var/private/ssl/client.pem'
         self._ssl_keyfile = '/var/private/ssl/key.pem'
-        self._ssl_key_password = 'exogeni'
+        self._ssl_key_password = 'fabric'
         self.rId = socket.gethostname()
 
     def logMessage(self, message):
