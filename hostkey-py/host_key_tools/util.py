@@ -21,7 +21,7 @@
 import os
 import tempfile
 
-from host_key_tools import LOGGER
+from . import LOGGER
 
 import logging
 import logging.handlers
@@ -30,22 +30,6 @@ from subprocess import Popen, PIPE, STDOUT
 
 from os import kill
 from signal import alarm, signal, SIGALRM, SIGKILL
-
-
-class TempFile(file):
-    """Copyright (c) 2010 Alon Swartz <alon@turnkeylinux.org> -
-    All Rights Reserved"""
-
-    def __init__(self, prefix='tmp', suffix=''):
-        fd, path = tempfile.mkstemp(suffix, prefix)
-        os.close(fd)
-        self.path = path
-        self.pid = os.getpid()
-        file.__init__(self, path, 'w')
-
-    def __del__(self):
-        if self.pid == os.getpid():
-            os.remove(self.path)
 
 
 class Commands:

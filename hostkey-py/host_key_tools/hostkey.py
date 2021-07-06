@@ -112,6 +112,7 @@ class HostNamePubKeyCustomizer():
             self.log.error(traceback.format_exc())
 
     def fetch_remote_public_ips(self):
+        self.log.debug("fetch_remote_public_ips IN")
         try:
             if not os.path.exists(self.privateKey):
                 return
@@ -166,6 +167,9 @@ class HostNamePubKeyCustomizer():
         except Exception as e:
             self.log.error('Exception was of type: %s' % (str(type(e))))
             self.log.error('Exception : %s' % (str(e)))
+        finally:
+            self.log.debug("fetch_remote_public_ips OUT")
+
 
     def __updateHostsFileWithCometHosts(self, newHosts):
         """

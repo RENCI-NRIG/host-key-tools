@@ -5,7 +5,7 @@ from kafka import *
 from ssl import create_default_context, Purpose
 import subprocess
 
-from host_key_tools.comet_common_iface import CometInterface
+from .comet_common_iface import CometInterface
 
 
 def _create_ssl_context(cafile=None, capath=None, cadata=None,

@@ -1,7 +1,7 @@
 __version__ = '1.0'
 
 import platform
-import ConfigParser
+import configparser
 
 _distro = platform.dist()[0]
 
@@ -23,7 +23,7 @@ _PidFileTimeout = '5'
 
 LOGGER = 'host_key_tools_logger'
 
-CONFIG = ConfigParser.SafeConfigParser()
+CONFIG = configparser.SafeConfigParser()
 CONFIG.add_section('runtime')
 CONFIG.add_section('logging')
 CONFIG.add_section('linux')
