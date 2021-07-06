@@ -24,15 +24,17 @@ import json
 import sys
 import logging
 import logging.handlers
+import traceback
 
 from optparse import OptionParser
-from daemon import runner
 
+import daemon
 from .comet_common_iface import CometInterface
 from .monitor import ResourceMonitor
 from .script import Script
 from .util import Commands
 from . import LOGGER
+
 
 class HostNamePubKeyCustomizer():
 
@@ -51,6 +53,7 @@ class HostNamePubKeyCustomizer():
         self.hostsFile = '/etc/hosts'
         self.keysFile = '/root/.ssh/authorized_keys'
         self.publicKey = '/root/.ssh/id_rsa.pub'
+        self.privateKey = '/root/.ssh/id_rsa'
         self.neucaPubKeysStr = ('NEuca comet pubkeys modifications - '
                                 'DO NOT EDIT BETWEEN THESE LINES. ###\n')
         self.neucaUserKeysStr = ('NEuca comet user keys modifications - '
@@ -59,6 +62,7 @@ class HostNamePubKeyCustomizer():
         self.stdout_path = '/dev/null'
         self.stderr_path = '/dev/null'
         self.stateDir = '/var/lib/hostkey'
+        self.public_ips = f"{self.stateDir}/public.json"
         self.pidDir = '/var/run'
         self.pidfile_path = (self.pidDir + '/' + "hostkey.pid" )
         self.pidfile_timeout = 10000
@@ -84,6 +88,84 @@ class HostNamePubKeyCustomizer():
              self.log.exception('Failed to obtain public ip using command: ' + str(cmd))
              self.log.error('Exception was of type: %s' % (str(type(e))))
 
+    def fetch_remote_public_ip(self, host: str) -> str:
+        try:
+            public_ip = None
+            import paramiko
+            key = paramiko.RSAKey.from_private_key_file(self.privateKey)
+            client = paramiko.SSHClient()
+            client.load_system_host_keys()
+            client.set_missing_host_key_policy(paramiko.MissingHostKeyPolicy())
+
+            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+            client.connect(host, username='root', pkey=key)
+            stdin, stdout, stderr = client.exec_command("curl http://169.254.169.254/latest/meta-data/public-ipv4")
+            if stderr is None:
+                public_ip = str(stdout.read(), 'utf-8').replace('\\n', '')
+                public_ip = public_ip.strip()
+                self.log.debug(f"Public IP for host: {host} {public_ip}")
+            client.close()
+            return public_ip
+        except Exception as e:
+            self.log.error(f"Failed to determine public IP for host: {host}: e: {e}")
+            self.log.error(traceback.format_exc())
+
+    def fetch_remote_public_ips(self):
+        try:
+            if not os.path.exists(self.privateKey):
+                return
+            self.log.debug("Updating Public IPs locally")
+
+            ip_hosts = {}
+            if os.path.exists(self.public_ips):
+                with open(self.public_ips, "r") as f:
+                    ip_hosts = json.loads(f.read())
+
+            section = "hosts" + self.family
+
+            comet = CometInterface(self.cometHost, None, None, None, self.log)
+            self.log.debug("Processing section " + section)
+            resp = comet.invokeRoundRobinApi('enumerate_families', self.sliceId, None, self.readToken, None,
+                                             section, None)
+
+            if resp.status_code != 200:
+                self.log.error("Failure occurred in enumerating family from comet" + section)
+                return
+
+            modified = False
+            if resp.json()["value"] and resp.json()["value"]["entries"]:
+                for e in resp.json()["value"]["entries"]:
+                    if e["key"] == self.rId:
+                        continue
+
+                    self.log.debug("processing " + e["key"])
+                    if e["value"] == "\"\"":
+                        continue
+                    try:
+                        hosts = json.loads(json.loads(e["value"])["val_"])
+                        for h in hosts:
+                            if h["ip"] == "":
+                                continue
+                            host = h["hostName"]
+
+                            if host not in ip_hosts:
+                                ip = self.fetch_remote_public_ip(host=host)
+                                if ip is not None:
+                                    ip_hosts[host] = ip
+                                    modified = True
+
+                    except Exception as e:
+                        self.log.error('Exception was of type: %s' % (str(type(e))))
+                        self.log.error('Exception : %s' % (str(e)))
+
+            if modified:
+                with open(self.public_ips, "w") as f:
+                    json.dump(ip_hosts, f)
+
+        except Exception as e:
+            self.log.error('Exception was of type: %s' % (str(type(e))))
+            self.log.error('Exception : %s' % (str(e)))
 
     def __updateHostsFileWithCometHosts(self, newHosts):
         """
@@ -119,7 +201,7 @@ class HostNamePubKeyCustomizer():
             if neucaStartEntry+1 != neucaEndEntry :
                 existingHosts = hostsEntries[neucaStartEntry+1:neucaEndEntry]
                 existingHosts.sort()
-            if cmp(existingHosts, newHosts):
+            if existingHosts != newHosts:
                 del hostsEntries[neucaStartEntry:neucaEndEntry+1]
                 modified = True
             else:
@@ -216,7 +298,7 @@ class HostNamePubKeyCustomizer():
             if neucaStartEntry+1 != neucaEndEntry :
                 existingKeys = keysEntries[neucaStartEntry+1:neucaEndEntry]
                 existingKeys.sort()
-            if cmp(existingKeys, newKeys) :
+            if existingKeys != newKeys:
                 del keysEntries[neucaStartEntry:neucaEndEntry+1]
                 modified = True
             else:
@@ -529,6 +611,7 @@ class HostNamePubKeyCustomizer():
                 self.updateHostsFromComet()
                 self.updateTokensFromComet()
                 self.runNewScripts()
+                self.fetch_remote_public_ips()
                 if self.firstRun:
                    self.pushNodeExporterInfoToMonitoring()
                 self.firstRun = False
@@ -623,7 +706,6 @@ def main():
         parser.print_help()
         sys.exit(1)
 
-
     initial_log_location = '/dev/tty'
     try:
     	logfd = open(initial_log_location, 'r')
@@ -640,7 +722,6 @@ def main():
 
     app = HostNamePubKeyCustomizer(options.cometHost, options.sliceId, options.readToken, options.writeToken,
                                    options.id, options.kafkahost, options.kafkatopic, options.cometFamily)
-    daemon_runner = runner.DaemonRunner(app)
 
     try:
 
@@ -666,20 +747,25 @@ def main():
         log.propagate = False
         log.info('Logging Started')
 
-        daemon_runner.daemon_context.files_preserve = [
-                 handler.stream,
-             ]
+        context = daemon.DaemonContext(pidfile=app.pidfile_path,
+                                       stderr=app.stderr_path,
+                                       stdin=app.stdin_path,
+                                       stdout=app.stdout_path,
+                                       files_preserve=handler.stream)
 
         log.info('Administrative operation: %s' % args[0])
-        daemon_runner.do_action()
+
+        with context:
+            app.run()
+
         log.info('Administrative after action: %s' % args[0])
 
         if args[0] == 'stop':
             app.cleanup()
 
-    except runner.DaemonRunnerStopFailureError as drsfe:
+    except Exception as e:
         log.propagate = True
-        log.error('Unable to stop service; reason was: %s' % str(drsfe))
+        log.error('Unable to stop service; reason was: %s' % str(e))
         log.error('Exiting...')
         sys.exit(1)
     sys.exit(0)
