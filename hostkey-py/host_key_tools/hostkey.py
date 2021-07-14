@@ -23,7 +23,7 @@ import time
 import json
 import sys
 import logging
-import logging.handlers
+from logging.handlers import RotatingFileHandler
 import traceback
 
 from optparse import OptionParser
@@ -710,25 +710,15 @@ def main():
         parser.print_help()
         sys.exit(1)
 
-    initial_log_location = '/dev/tty'
-    try:
-    	logfd = open(initial_log_location, 'r')
-    except:
-        initial_log_location = '/dev/null'
-    else:
-        logfd.close()
-
-    log_format = \
-        '%(asctime)s - %(name)s - {%(filename)s:%(lineno)d} - [%(threadName)s] - %(levelname)s - %(message)s'
-    logging.basicConfig(format=log_format, filename=initial_log_location)
-    log = logging.getLogger(LOGGER)
-    log.setLevel('DEBUG')
-
     app = HostNamePubKeyCustomizer(options.cometHost, options.sliceId, options.readToken, options.writeToken,
                                    options.id, options.kafkahost, options.kafkatopic, options.cometFamily)
 
+    log = logging.getLogger("hostkey")
+
     try:
 
+        log_format = \
+            '%(asctime)s - %(name)s - {%(filename)s:%(lineno)d} - [%(threadName)s] - %(levelname)s - %(message)s'
         log_dir = "/var/log/hostkey/"
         log_level = "DEBUG"
         log_file = "hostkey.log"
@@ -746,6 +736,8 @@ def main():
         handler.setLevel(log_level)
         formatter = logging.Formatter(log_format)
         handler.setFormatter(formatter)
+
+        log.setLevel(log_level)
 
         log.addHandler(handler)
         log.propagate = False
