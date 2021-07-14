@@ -763,6 +763,7 @@ def main():
         log.propagate = True
         log.error('Unable to stop service; reason was: %s' % str(e))
         log.error('Exiting...')
+        log.error(traceback.format_exc())
         sys.exit(1)
     sys.exit(0)
 
