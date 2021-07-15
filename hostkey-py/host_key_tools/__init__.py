@@ -3,7 +3,6 @@ __version__ = '1.0'
 import platform
 import configparser
 
-_distro = platform.dist()[0]
 
 _ConfDir = '/etc/hostkey'
 _ConfFile = 'config'

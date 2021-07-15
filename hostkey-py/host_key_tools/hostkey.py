@@ -32,7 +32,6 @@ from optparse import OptionParser
 from .comet_common_iface import CometInterface
 from .monitor import ResourceMonitor
 from .script import Script
-from .util import Commands
 from . import LOGGER
 from .graceful_interrupt_handler import GracefulInterruptHandler
 
@@ -117,7 +116,7 @@ class HostNamePubKeyCustomizer:
     def get_public_ip(self):
         try:
              cmd = ["/bin/curl", "-s", "http://169.254.169.254/2009-04-04/meta-data/public-ipv4"]
-             (rtncode, data_stdout, data_stderr) = Commands.run(cmd, timeout=60)
+             (rtncode, data_stdout, data_stderr) = subprocess.run(cmd)
              self.ip = data_stdout.strip()
         except Exception as e:
              self.log.exception('Failed to obtain public ip using command: ' + str(cmd))
