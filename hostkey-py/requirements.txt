@@ -1,4 +1,3 @@
 Kafka-python
-python-daemon
 requests
 paramiko

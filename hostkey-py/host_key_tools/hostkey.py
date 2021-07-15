@@ -19,6 +19,7 @@
 import os
 import socket
 import subprocess
+import threading
 import time
 import json
 import sys
@@ -28,17 +29,17 @@ import traceback
 
 from optparse import OptionParser
 
-import daemon
 from .comet_common_iface import CometInterface
 from .monitor import ResourceMonitor
 from .script import Script
 from .util import Commands
 from . import LOGGER
+from .graceful_interrupt_handler import GracefulInterruptHandler
 
 
-class HostNamePubKeyCustomizer():
-
-    def __init__(self, cometHost, sliceId, readToken, writeToken, rId, kafkahost, kafkaTopic, family):
+class HostNamePubKeyCustomizer:
+    def __init__(self, cometHost: str, sliceId: str, readToken: str, writeToken: str, rId, kafkahost: str,
+                 kafkaTopic: str, family: str):
         self.firstRun = True
         self.cometHost = cometHost
         self.sliceId = sliceId
@@ -79,7 +80,41 @@ class HostNamePubKeyCustomizer():
         if not os.path.exists(self.pidDir):
             os.makedirs(self.pidDir)
 
-    def getPublicIP(self):
+        self.thread = None
+        self.stopped = False
+
+    def start(self):
+        """
+        Start the daemon
+        """
+        try:
+            if self.thread is not None:
+                raise Exception("hostkey daemon has already been started")
+
+            self.thread = threading.Thread(target=self.run)
+            self.thread.setName("hostkeyd")
+            self.thread.setDaemon(True)
+            self.thread.start()
+        except Exception as e:
+            self.log.error(f"Failed to start the daemon: {e}")
+            self.log.error(traceback.format_exc())
+
+    def stop(self):
+        """
+        Stop the daemon
+        """
+        self.stopped = True
+        temp = self.thread
+        self.thread = None
+        if temp is not None:
+            self.log.warning("It seems that the hostkeyd thread is running. Interrupting it")
+            try:
+                temp.join()
+            except Exception as e:
+                self.log.error("Could not join actor thread {}".format(e))
+                self.log.error(traceback.format_exc())
+
+    def get_public_ip(self):
         try:
              cmd = ["/bin/curl", "-s", "http://169.254.169.254/2009-04-04/meta-data/public-ipv4"]
              (rtncode, data_stdout, data_stderr) = Commands.run(cmd, timeout=60)
@@ -169,7 +204,6 @@ class HostNamePubKeyCustomizer():
             self.log.error('Exception : %s' % (str(e)))
         finally:
             self.log.debug("fetch_remote_public_ips OUT")
-
 
     def __updateHostsFileWithCometHosts(self, newHosts):
         """
@@ -605,8 +639,11 @@ class HostNamePubKeyCustomizer():
 
     def run(self):
         while True:
+            if self.stopped:
+                self.log.info("hostkeyd exiting")
+                return
             try:
-                self.getPublicIP()
+                self.get_public_ip()
                 self.log.debug('Polling')
                 self.updateHostsToComet()
                 self.updatePubKeysToComet()
@@ -632,7 +669,7 @@ class HostNamePubKeyCustomizer():
         if self.kafkahost is not None:
              mon=ResourceMonitor(self.sliceId, None, None, self.kafkahost, self.log)
              mon.deleteTopics()
-
+'''
 def main():
     usagestr = 'Usage: %prog start|stop|restart options'
     parser = OptionParser(usage=usagestr)
@@ -760,6 +797,134 @@ def main():
             app.cleanup()
 
     except Exception as e:
+        log.propagate = True
+        log.error('Unable to stop service; reason was: %s' % str(e))
+        log.error('Exiting...')
+        log.error(traceback.format_exc())
+        sys.exit(1)
+    sys.exit(0)
+'''
+
+def main():
+    log = logging.getLogger("hostkey")
+    try:
+        usagestr = 'Usage: %prog start|stop|restart options'
+        parser = OptionParser(usage=usagestr)
+        parser.add_option(
+            '-c',
+            '--cometHost',
+            dest='cometHost',
+            type=str,
+            help='Comet Host'
+        )
+        parser.add_option(
+            '-s',
+            '--sliceId',
+            dest='sliceId',
+            type=str,
+            help='Slice Id'
+        )
+        parser.add_option(
+            '-r',
+            '--readToken',
+            dest='readToken',
+            type=str,
+            help='Read Token'
+        )
+        parser.add_option(
+            '-w',
+            '--writeToken',
+            dest='writeToken',
+            type=str,
+            help='Write Token'
+        )
+        parser.add_option(
+            '-f',
+            '--cometFamily',
+            dest='cometFamily',
+            type=str,
+            default='all',
+            help='Comet Family Suffix'
+        )
+        parser.add_option(
+            '-i',
+            '--id',
+            dest='id',
+            type=str,
+            help='id'
+        )
+        parser.add_option(
+            '-k',
+            '--kafkahost',
+            dest='kafkahost',
+            type=str,
+            help='kafkahost'
+        )
+        parser.add_option(
+            '-t',
+            '--kafkatopic',
+            dest='kafkatopic',
+            type=str,
+            help='kafkatopic'
+        )
+
+        options, args = parser.parse_args()
+
+        if len(args) != 1:
+            parser.print_help()
+            sys.exit(1)
+
+        if args[0] == 'start':
+            sys.argv = [sys.argv[0], 'start']
+        elif args[0] == 'stop':
+            sys.argv = [sys.argv[0], 'stop']
+        elif args[0] == 'restart':
+            sys.argv = [sys.argv[0], 'restart']
+        else:
+            parser.print_help()
+            sys.exit(1)
+
+        app = HostNamePubKeyCustomizer(options.cometHost, options.sliceId, options.readToken, options.writeToken,
+                                       options.id, options.kafkahost, options.kafkatopic, options.cometFamily)
+
+        log_format = \
+            '%(asctime)s - %(name)s - {%(filename)s:%(lineno)d} - [%(threadName)s] - %(levelname)s - %(message)s'
+        log_dir = "/var/log/hostkey/"
+        log_level = "DEBUG"
+        log_file = "hostkey.log"
+        log_retain = 5
+        log_file_size = 5000000
+        log_level = 'DEBUG'
+
+        if not os.path.exists(log_dir):
+             os.makedirs(log_dir)
+
+        handler = logging.handlers.RotatingFileHandler(
+                 log_dir + '/' + log_file,
+                 backupCount=log_retain,
+                 maxBytes=log_file_size)
+        handler.setLevel(log_level)
+        formatter = logging.Formatter(log_format)
+        handler.setFormatter(formatter)
+
+        log.setLevel(log_level)
+
+        log.addHandler(handler)
+        log.propagate = False
+
+        log.info('Administrative operation: %s' % args[0])
+        with GracefulInterruptHandler() as h:
+            app.start()
+            while True:
+                time.sleep(0.0001)
+                if h.interrupted:
+                    app.stop()
+
+                if args[0] == 'stop':
+                    app.cleanup()
+
+        log.info('Administrative after action: %s' % args[0])
+    except Exception:
         log.propagate = True
         log.error('Unable to stop service; reason was: %s' % str(e))
         log.error('Exiting...')
