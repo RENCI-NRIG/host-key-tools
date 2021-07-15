@@ -116,7 +116,7 @@ class HostNamePubKeyCustomizer:
     def get_public_ip(self):
         try:
             cmd = ["/bin/curl", "-s", "http://169.254.169.254/2009-04-04/meta-data/public-ipv4"]
-            completed_process = subprocess.run(cmd)
+            completed_process = subprocess.run(cmd, capture_output=True)
             self.ip = completed_process.stdout.strip()
         except Exception as e:
             self.log.exception('Failed to obtain public ip using command: ' + str(cmd))
