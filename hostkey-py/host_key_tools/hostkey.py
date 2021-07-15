@@ -115,12 +115,12 @@ class HostNamePubKeyCustomizer:
 
     def get_public_ip(self):
         try:
-             cmd = ["/bin/curl", "-s", "http://169.254.169.254/2009-04-04/meta-data/public-ipv4"]
-             (rtncode, data_stdout, data_stderr) = subprocess.run(cmd)
-             self.ip = data_stdout.strip()
+            cmd = ["/bin/curl", "-s", "http://169.254.169.254/2009-04-04/meta-data/public-ipv4"]
+            completed_process = subprocess.run(cmd)
+            self.ip = completed_process.stdout.strip()
         except Exception as e:
-             self.log.exception('Failed to obtain public ip using command: ' + str(cmd))
-             self.log.error('Exception was of type: %s' % (str(type(e))))
+            self.log.exception('Failed to obtain public ip using command: ' + str(cmd))
+            self.log.error('Exception was of type: %s' % (str(type(e))))
 
     def fetch_remote_public_ip(self, host: str) -> str:
         try:
