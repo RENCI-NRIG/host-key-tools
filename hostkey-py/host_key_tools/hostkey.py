@@ -32,7 +32,7 @@ from optparse import OptionParser
 from .comet_common_iface import CometInterface
 from .monitor import ResourceMonitor
 from .script import Script
-from . import LOGGER
+from . import LOGGER, CONFIG
 from .graceful_interrupt_handler import GracefulInterruptHandler
 
 
@@ -58,9 +58,6 @@ class HostNamePubKeyCustomizer:
                                 'DO NOT EDIT BETWEEN THESE LINES. ###\n')
         self.neucaUserKeysStr = ('NEuca comet user keys modifications - '
                                  'DO NOT EDIT BETWEEN THESE LINES. ###\n')
-        self.stdin_path = '/dev/null'
-        self.stdout_path = '/dev/null'
-        self.stderr_path = '/dev/null'
         self.stateDir = '/var/lib/hostkey'
         self.public_ips = f"{self.stateDir}/public.json"
         self.pidDir = '/var/run'
@@ -69,7 +66,7 @@ class HostNamePubKeyCustomizer:
         self.kafkahost = kafkahost
         self.kafkaTopic = kafkaTopic
 
-        self.log = logging.getLogger(LOGGER)
+        self.log = self.make_logger()
 
         # Need to ensure that the state directory is created.
         if not os.path.exists(self.stateDir):
@@ -82,6 +79,44 @@ class HostNamePubKeyCustomizer:
         self.thread = None
         self.stopped = False
 
+    @staticmethod
+    def make_logger() -> logging.Logger:
+        """
+        Detects the path and level for the log file from the config and sets
+        up a logger.
+
+       :return: logging.Logger object
+        """
+        log_file = CONFIG.get("logging", "log-file")
+        log_directory = CONFIG.get("logging", "log-directory")
+        log_path = f"{log_directory}/{log_file}"
+
+        if log_path is None:
+            raise RuntimeError('The log file path must be specified in config')
+
+        # Get the log level
+        log_level = CONFIG.get("logging", "log-level")
+
+        if log_level is None:
+            log_level = logging.INFO
+
+        # Set up the root logger
+        log = logging.getLogger(LOGGER)
+        log.setLevel(log_level)
+        log_format = \
+            '%(asctime)s - %(name)s - {%(filename)s:%(lineno)d} - [%(threadName)s] - %(levelname)s - %(message)s'
+
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
+
+        backup_count = CONFIG.get("logging", "log-retain")
+        max_log_size = CONFIG.get("logging", "log-file-size")
+
+        file_handler = RotatingFileHandler(log_path, backupCount=int(backup_count), maxBytes=int(max_log_size))
+
+        logging.basicConfig(handlers=[file_handler], format=log_format)
+
+        return log
+
     def start(self):
         """
         Start the daemon
@@ -91,7 +126,7 @@ class HostNamePubKeyCustomizer:
                 raise Exception("hostkey daemon has already been started")
 
             self.thread = threading.Thread(target=self.run)
-            self.thread.setName("hostkeyd")
+            self.thread.setName(LOGGER)
             self.thread.setDaemon(True)
             self.thread.start()
         except Exception as e:
@@ -639,7 +674,7 @@ class HostNamePubKeyCustomizer:
     def run(self):
         while True:
             if self.stopped:
-                self.log.info("hostkeyd exiting")
+                self.log.info(f"{LOGGER} exiting")
                 return
             try:
                 self.get_public_ip()
@@ -653,7 +688,7 @@ class HostNamePubKeyCustomizer:
                 self.runNewScripts()
                 self.fetch_remote_public_ips()
                 if self.firstRun:
-                   self.pushNodeExporterInfoToMonitoring()
+                    self.pushNodeExporterInfoToMonitoring()
                 self.firstRun = False
             except KeyboardInterrupt:
                 self.log.error('Terminating on keyboard interrupt...')
@@ -666,250 +701,48 @@ class HostNamePubKeyCustomizer:
 
     def cleanup(self):
         if self.kafkahost is not None:
-             mon=ResourceMonitor(self.sliceId, None, None, self.kafkahost, self.log)
+             mon = ResourceMonitor(self.sliceId, None, None, self.kafkahost, self.log)
              mon.deleteTopics()
-'''
-def main():
-    usagestr = 'Usage: %prog start|stop|restart options'
-    parser = OptionParser(usage=usagestr)
-    parser.add_option(
-        '-c',
-        '--cometHost',
-        dest='cometHost',
-        type = str,
-        help='Comet Host'
-    )
-    parser.add_option(
-        '-s',
-        '--sliceId',
-        dest='sliceId',
-        type = str,
-        help='Slice Id'
-    )
-    parser.add_option(
-        '-r',
-        '--readToken',
-        dest='readToken',
-        type = str,
-        help='Read Token'
-    )
-    parser.add_option(
-        '-w',
-        '--writeToken',
-        dest='writeToken',
-        type = str,
-        help='Write Token'
-    )
-    parser.add_option(
-        '-f',
-        '--cometFamily',
-        dest='cometFamily',
-        type = str,
-        default = 'all',
-        help='Comet Family Suffix'
-    )
-    parser.add_option(
-        '-i',
-        '--id',
-        dest='id',
-        type = str,
-        help='id'
-    )
-    parser.add_option(
-        '-k',
-        '--kafkahost',
-        dest='kafkahost',
-        type = str,
-        help='kafkahost'
-    )
-    parser.add_option(
-        '-t',
-        '--kafkatopic',
-        dest='kafkatopic',
-        type=str,
-        help='kafkatopic'
-    )
 
-    options, args = parser.parse_args()
 
-    if len(args) != 1:
-        parser.print_help()
-        sys.exit(1)
+def setup_parser():
+    usage_str = 'Usage: %prog start|stop|restart options'
 
-    if args[0] == 'start':
-        sys.argv = [sys.argv[0], 'start']
-    elif args[0] == 'stop':
-        sys.argv = [sys.argv[0], 'stop']
-    elif args[0] == 'restart':
-        sys.argv = [sys.argv[0], 'restart']
-    else:
-        parser.print_help()
-        sys.exit(1)
+    parser = OptionParser(usage=usage_str)
+    parser.add_option('-c', '--cometHost', dest='cometHost', type=str, help='Comet Host')
+    parser.add_option('-s', '--sliceId', dest='sliceId', type=str, help='Slice Id')
+    parser.add_option('-r', '--readToken', dest='readToken', type=str, help='Read Token')
+    parser.add_option('-w', '--writeToken', dest='writeToken', type=str, help='Write Token')
+    parser.add_option('-f', '--cometFamily', dest='cometFamily', type=str, default='all', help='Comet Family Suffix')
+    parser.add_option('-i', '--id', dest='id', type=str, help='id')
+    parser.add_option('-k', '--kafkahost', dest='kafkahost', type=str, help='kafkahost')
+    parser.add_option('-t', '--kafkatopic', dest='kafkatopic', type=str, help='kafkatopic')
 
-    app = HostNamePubKeyCustomizer(options.cometHost, options.sliceId, options.readToken, options.writeToken,
-                                   options.id, options.kafkahost, options.kafkatopic, options.cometFamily)
+    return parser
 
-    log = logging.getLogger("hostkey")
-
-    try:
-
-        log_format = \
-            '%(asctime)s - %(name)s - {%(filename)s:%(lineno)d} - [%(threadName)s] - %(levelname)s - %(message)s'
-        log_dir = "/var/log/hostkey/"
-        log_level = "DEBUG"
-        log_file = "hostkey.log"
-        log_retain = 5
-        log_file_size = 5000000
-        log_level = 'DEBUG'
-
-        if not os.path.exists(log_dir):
-             os.makedirs(log_dir)
-
-        handler = logging.handlers.RotatingFileHandler(
-                 log_dir + '/' + log_file,
-                 backupCount=log_retain,
-                 maxBytes=log_file_size)
-        handler.setLevel(log_level)
-        formatter = logging.Formatter(log_format)
-        handler.setFormatter(formatter)
-
-        log.setLevel(log_level)
-
-        log.addHandler(handler)
-        log.propagate = False
-        log.info('Logging Started')
-
-        context = daemon.DaemonContext(pidfile=app.pidfile_path,
-                                       stderr=app.stderr_path,
-                                       stdin=app.stdin_path,
-                                       stdout=app.stdout_path,
-                                       files_preserve=handler.stream)
-
-        log.info('Administrative operation: %s' % args[0])
-
-        with context:
-            app.run()
-
-        log.info('Administrative after action: %s' % args[0])
-
-        if args[0] == 'stop':
-            app.cleanup()
-
-    except Exception as e:
-        log.propagate = True
-        log.error('Unable to stop service; reason was: %s' % str(e))
-        log.error('Exiting...')
-        log.error(traceback.format_exc())
-        sys.exit(1)
-    sys.exit(0)
-'''
 
 def main():
-    log = logging.getLogger("hostkey")
+    log = HostNamePubKeyCustomizer.make_logger()
     try:
-        usagestr = 'Usage: %prog start|stop|restart options'
-        parser = OptionParser(usage=usagestr)
-        parser.add_option(
-            '-c',
-            '--cometHost',
-            dest='cometHost',
-            type=str,
-            help='Comet Host'
-        )
-        parser.add_option(
-            '-s',
-            '--sliceId',
-            dest='sliceId',
-            type=str,
-            help='Slice Id'
-        )
-        parser.add_option(
-            '-r',
-            '--readToken',
-            dest='readToken',
-            type=str,
-            help='Read Token'
-        )
-        parser.add_option(
-            '-w',
-            '--writeToken',
-            dest='writeToken',
-            type=str,
-            help='Write Token'
-        )
-        parser.add_option(
-            '-f',
-            '--cometFamily',
-            dest='cometFamily',
-            type=str,
-            default='all',
-            help='Comet Family Suffix'
-        )
-        parser.add_option(
-            '-i',
-            '--id',
-            dest='id',
-            type=str,
-            help='id'
-        )
-        parser.add_option(
-            '-k',
-            '--kafkahost',
-            dest='kafkahost',
-            type=str,
-            help='kafkahost'
-        )
-        parser.add_option(
-            '-t',
-            '--kafkatopic',
-            dest='kafkatopic',
-            type=str,
-            help='kafkatopic'
-        )
-
+        parser = setup_parser()
         options, args = parser.parse_args()
 
         if len(args) != 1:
             parser.print_help()
             sys.exit(1)
 
+        start = False
+
         if args[0] == 'start':
-            sys.argv = [sys.argv[0], 'start']
+            start = True
         elif args[0] == 'stop':
-            sys.argv = [sys.argv[0], 'stop']
-        elif args[0] == 'restart':
-            sys.argv = [sys.argv[0], 'restart']
+            start = False
         else:
             parser.print_help()
             sys.exit(1)
 
         app = HostNamePubKeyCustomizer(options.cometHost, options.sliceId, options.readToken, options.writeToken,
                                        options.id, options.kafkahost, options.kafkatopic, options.cometFamily)
-
-        log_format = \
-            '%(asctime)s - %(name)s - {%(filename)s:%(lineno)d} - [%(threadName)s] - %(levelname)s - %(message)s'
-        log_dir = "/var/log/hostkey/"
-        log_level = "DEBUG"
-        log_file = "hostkey.log"
-        log_retain = 5
-        log_file_size = 5000000
-        log_level = 'DEBUG'
-
-        if not os.path.exists(log_dir):
-             os.makedirs(log_dir)
-
-        handler = logging.handlers.RotatingFileHandler(
-                 log_dir + '/' + log_file,
-                 backupCount=log_retain,
-                 maxBytes=log_file_size)
-        handler.setLevel(log_level)
-        formatter = logging.Formatter(log_format)
-        handler.setFormatter(formatter)
-
-        log.setLevel(log_level)
-
-        log.addHandler(handler)
-        log.propagate = False
 
         log.info('Administrative operation: %s' % args[0])
         with GracefulInterruptHandler() as h:
@@ -923,14 +756,10 @@ def main():
                     app.cleanup()
 
         log.info('Administrative after action: %s' % args[0])
-    except Exception:
+    except Exception as e:
         log.propagate = True
         log.error('Unable to stop service; reason was: %s' % str(e))
         log.error('Exiting...')
         log.error(traceback.format_exc())
         sys.exit(1)
     sys.exit(0)
-
-
-if __name__ == '__main__':
-    main()
