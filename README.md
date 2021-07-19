@@ -16,7 +16,8 @@ psutil
 ```
 git clone https://github.com/RENCI-NRIG/host-key-tools.git 
 cd host-key-tools/hostkey-py/
-python setup.py install
+pip3.9 install -r requirements.txt
+python3.9 setup.py install
 ```
 
 ## Usage
