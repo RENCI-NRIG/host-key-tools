@@ -19,24 +19,26 @@
 import os
 import socket
 import subprocess
-import time
 import json
 import sys
 import logging
-import logging.handlers
+import time
+from logging.handlers import RotatingFileHandler
+import traceback
 
 from optparse import OptionParser
-from daemon import runner
 
 from .comet_common_iface import CometInterface
 from .monitor import ResourceMonitor
 from .script import Script
-from .util import Commands
-from . import LOGGER
+from . import LOGGER, CONFIG
+from .daemon import Daemon
 
-class HostNamePubKeyCustomizer():
 
-    def __init__(self, cometHost, sliceId, readToken, writeToken, rId, kafkahost, kafkaTopic, family):
+class HostNamePubKeyCustomizer(Daemon):
+    def __init__(self, cometHost: str, sliceId: str, readToken: str,
+                 writeToken: str, rId, kafkahost: str, kafkaTopic: str, family: str):
+        super().__init__()
         self.firstRun = True
         self.cometHost = cometHost
         self.sliceId = sliceId
@@ -51,21 +53,20 @@ class HostNamePubKeyCustomizer():
         self.hostsFile = '/etc/hosts'
         self.keysFile = '/root/.ssh/authorized_keys'
         self.publicKey = '/root/.ssh/id_rsa.pub'
+        self.privateKey = '/root/.ssh/id_rsa'
         self.neucaPubKeysStr = ('NEuca comet pubkeys modifications - '
                                 'DO NOT EDIT BETWEEN THESE LINES. ###\n')
         self.neucaUserKeysStr = ('NEuca comet user keys modifications - '
                                  'DO NOT EDIT BETWEEN THESE LINES. ###\n')
-        self.stdin_path = '/dev/null'
-        self.stdout_path = '/dev/null'
-        self.stderr_path = '/dev/null'
         self.stateDir = '/var/lib/hostkey'
+        self.public_ips = f"{self.stateDir}/public.json"
         self.pidDir = '/var/run'
         self.pidfile_path = (self.pidDir + '/' + "hostkey.pid" )
         self.pidfile_timeout = 10000
         self.kafkahost = kafkahost
         self.kafkaTopic = kafkaTopic
 
-        self.log = logging.getLogger(LOGGER)
+        self.log = self.make_logger()
 
         # Need to ensure that the state directory is created.
         if not os.path.exists(self.stateDir):
@@ -75,15 +76,155 @@ class HostNamePubKeyCustomizer():
         if not os.path.exists(self.pidDir):
             os.makedirs(self.pidDir)
 
-    def getPublicIP(self):
-        try:
-             cmd = ["/bin/curl", "-s", "http://169.254.169.254/2009-04-04/meta-data/public-ipv4"]
-             (rtncode, data_stdout, data_stderr) = Commands.run(cmd, timeout=60)
-             self.ip = data_stdout.strip()
-        except Exception as e:
-             self.log.exception('Failed to obtain public ip using command: ' + str(cmd))
-             self.log.error('Exception was of type: %s' % (str(type(e))))
+    @staticmethod
+    def make_logger() -> logging.Logger:
+        """
+        Detects the path and level for the log file from the config and sets
+        up a logger.
 
+       :return: logging.Logger object
+        """
+        log_file = CONFIG.get("logging", "log-file")
+        log_directory = CONFIG.get("logging", "log-directory")
+        log_path = f"{log_directory}/{log_file}"
+
+        if log_path is None:
+            raise RuntimeError('The log file path must be specified in config')
+
+        # Get the log level
+        log_level = CONFIG.get("logging", "log-level")
+
+        if log_level is None:
+            log_level = logging.INFO
+
+        # Set up the root logger
+        log = logging.getLogger(LOGGER)
+        log.setLevel(log_level)
+        log_format = \
+            '%(asctime)s - %(name)s - {%(filename)s:%(lineno)d} - [%(threadName)s] - %(levelname)s - %(message)s'
+
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
+
+        backup_count = CONFIG.get("logging", "log-retain")
+        max_log_size = CONFIG.get("logging", "log-file-size")
+
+        file_handler = RotatingFileHandler(log_path, backupCount=int(backup_count), maxBytes=int(max_log_size))
+
+        logging.basicConfig(handlers=[file_handler], format=log_format)
+
+        return log
+
+    def start(self):
+        """
+        Start the daemon
+        """
+
+        if not os.path.exists(self.pidfile_path):
+            with open(self.pidfile_path, 'w') as fp:
+                pass
+
+        super().start()
+
+    def stop(self):
+        """
+        Stop the daemon
+        """
+        if os.path.exists(self.pidfile_path):
+            self.log.info("Removing the pid file")
+            os.remove(self.pidfile_path)
+        self.cleanup()
+
+        super().stop()
+
+    def get_public_ip(self):
+        try:
+            cmd = ["/bin/curl", "-s", "http://169.254.169.254/latest/meta-data/public-ipv4"]
+            completed_process = subprocess.run(cmd, capture_output=True)
+            ip = completed_process.stdout.strip()
+            self.ip = str(ip, 'utf-8').strip()
+        except Exception as e:
+            self.log.error(f'Failed to obtain public ip using command: {e}')
+            self.log.error(traceback.format_exc())
+
+    def fetch_remote_public_ip(self, host: str) -> str:
+        try:
+            public_ip = None
+            import paramiko
+            key = paramiko.RSAKey.from_private_key_file(self.privateKey)
+            client = paramiko.SSHClient()
+            client.load_system_host_keys()
+            client.set_missing_host_key_policy(paramiko.MissingHostKeyPolicy())
+
+            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+            client.connect(host, username='root', pkey=key)
+            stdin, stdout, stderr = client.exec_command("curl http://169.254.169.254/latest/meta-data/public-ipv4")
+            stdout_str = str(stdout.read(), 'utf-8').strip()
+            self.log.debug(f"Public IP for host: {host} {stdout_str}")
+            client.close()
+            return stdout_str
+        except Exception as e:
+            self.log.error(f"Failed to determine public IP for host: {host}: e: {e}")
+            self.log.error(traceback.format_exc())
+
+    def fetch_remote_public_ips(self):
+        self.log.debug("fetch_remote_public_ips IN")
+        try:
+            if not os.path.exists(self.privateKey):
+                return
+            self.log.debug("Updating Public IPs locally")
+
+            ip_hosts = {}
+            if os.path.exists(self.public_ips):
+                with open(self.public_ips, "r") as f:
+                    ip_hosts = json.loads(f.read())
+
+            section = "hosts" + self.family
+
+            comet = CometInterface(self.cometHost, None, None, None, self.log)
+            self.log.debug("Processing section " + section)
+            resp = comet.invokeRoundRobinApi('enumerate_families', self.sliceId, None, self.readToken, None,
+                                             section, None)
+
+            if resp.status_code != 200:
+                self.log.error("Failure occurred in enumerating family from comet" + section)
+                return
+
+            modified = False
+            if resp.json()["value"] and resp.json()["value"]["entries"]:
+                for e in resp.json()["value"]["entries"]:
+                    if e["key"] == self.rId:
+                        continue
+
+                    self.log.debug("processing " + e["key"])
+                    if e["value"] == "\"\"":
+                        continue
+                    try:
+                        hosts = json.loads(json.loads(e["value"])["val_"])
+                        for h in hosts:
+                            if h["ip"] == "":
+                                continue
+                            host = h["hostName"]
+
+                            if host not in ip_hosts:
+                                ip = self.fetch_remote_public_ip(host=host)
+                                if ip is not None:
+                                    ip_hosts[host] = ip
+                                    modified = True
+
+                    except Exception as e:
+                        self.log.error('Exception was of type: %s' % (str(type(e))))
+                        self.log.error('Exception : %s' % (str(e)))
+
+            if modified:
+                with open(self.public_ips, "w") as f:
+                    json.dump(ip_hosts, f)
+
+        except Exception as e:
+            self.log.error('Exception was of type: %s' % (str(type(e))))
+            self.log.error('Exception : %s' % (str(e)))
+        finally:
+            self.log.debug("fetch_remote_public_ips OUT")
 
     def __updateHostsFileWithCometHosts(self, newHosts):
         """
@@ -119,7 +260,7 @@ class HostNamePubKeyCustomizer():
             if neucaStartEntry+1 != neucaEndEntry :
                 existingHosts = hostsEntries[neucaStartEntry+1:neucaEndEntry]
                 existingHosts.sort()
-            if cmp(existingHosts, newHosts):
+            if existingHosts != newHosts:
                 del hostsEntries[neucaStartEntry:neucaEndEntry+1]
                 modified = True
             else:
@@ -216,7 +357,7 @@ class HostNamePubKeyCustomizer():
             if neucaStartEntry+1 != neucaEndEntry :
                 existingKeys = keysEntries[neucaStartEntry+1:neucaEndEntry]
                 existingKeys.sort()
-            if cmp(existingKeys, newKeys) :
+            if existingKeys != newKeys:
                 del keysEntries[neucaStartEntry:neucaEndEntry+1]
                 modified = True
             else:
@@ -518,172 +659,82 @@ class HostNamePubKeyCustomizer():
             script.run()
 
     def run(self):
-        while True:
-            try:
-                self.getPublicIP()
-                self.log.debug('Polling')
-                self.updateHostsToComet()
-                self.updatePubKeysToComet()
-                self.updateTokensToComet()
-                self.updatePubKeysFromComet()
-                self.updateHostsFromComet()
-                self.updateTokensFromComet()
-                self.runNewScripts()
-                if self.firstRun:
-                   self.pushNodeExporterInfoToMonitoring()
-                self.firstRun = False
-            except KeyboardInterrupt:
-                self.log.error('Terminating on keyboard interrupt...')
-                sys.exit(0)
-            except Exception as e:
-                self.log.exception(('Caught exception in daemon loop; ' +
-                                    'backtrace follows.'))
-                self.log.error('Exception was of type: %s' % (str(type(e))))
-            time.sleep(60)
+        try:
+            self.get_public_ip()
+            self.log.debug('Polling')
+            self.updateHostsToComet()
+            self.updatePubKeysToComet()
+            self.updateTokensToComet()
+            self.updatePubKeysFromComet()
+            self.updateHostsFromComet()
+            self.updateTokensFromComet()
+            self.runNewScripts()
+            self.fetch_remote_public_ips()
+            if self.firstRun:
+                self.pushNodeExporterInfoToMonitoring()
+            self.firstRun = False
+        except KeyboardInterrupt:
+            self.log.error('Terminating on keyboard interrupt...')
+            sys.exit(0)
+        except Exception as e:
+            self.log.exception(('Caught exception in daemon loop; ' +
+                                'backtrace follows.'))
+            self.log.error('Exception was of type: %s' % (str(type(e))))
+        time.sleep(60)
 
     def cleanup(self):
         if self.kafkahost is not None:
-             mon=ResourceMonitor(self.sliceId, None, None, self.kafkahost, self.log)
+             mon = ResourceMonitor(self.sliceId, None, None, self.kafkahost, self.log)
              mon.deleteTopics()
 
-def main():
-    usagestr = 'Usage: %prog start|stop|restart options'
-    parser = OptionParser(usage=usagestr)
-    parser.add_option(
-        '-c',
-        '--cometHost',
-        dest='cometHost',
-        type = str,
-        help='Comet Host'
-    )
-    parser.add_option(
-        '-s',
-        '--sliceId',
-        dest='sliceId',
-        type = str,
-        help='Slice Id'
-    )
-    parser.add_option(
-        '-r',
-        '--readToken',
-        dest='readToken',
-        type = str,
-        help='Read Token'
-    )
-    parser.add_option(
-        '-w',
-        '--writeToken',
-        dest='writeToken',
-        type = str,
-        help='Write Token'
-    )
-    parser.add_option(
-        '-f',
-        '--cometFamily',
-        dest='cometFamily',
-        type = str,
-        default = 'all',
-        help='Comet Family Suffix'
-    )
-    parser.add_option(
-        '-i',
-        '--id',
-        dest='id',
-        type = str,
-        help='id'
-    )
-    parser.add_option(
-        '-k',
-        '--kafkahost',
-        dest='kafkahost',
-        type = str,
-        help='kafkahost'
-    )
-    parser.add_option(
-        '-t',
-        '--kafkatopic',
-        dest='kafkatopic',
-        type=str,
-        help='kafkatopic'
-    )
 
+def setup_parser():
+    usage_str = f"Usage: {sys.argv[0]} (start|stop|restart|status|reload|version)"
+
+    parser = OptionParser(usage=usage_str)
+    parser.add_option('-c', '--cometHost', dest='cometHost', type=str, help='Comet Host')
+    parser.add_option('-s', '--sliceId', dest='sliceId', type=str, help='Slice Id')
+    parser.add_option('-r', '--readToken', dest='readToken', type=str, help='Read Token')
+    parser.add_option('-w', '--writeToken', dest='writeToken', type=str, help='Write Token')
+    parser.add_option('-f', '--cometFamily', dest='cometFamily', type=str, default='all', help='Comet Family Suffix')
+    parser.add_option('-i', '--id', dest='id', type=str, help='id')
+    parser.add_option('-k', '--kafkahost', dest='kafkahost', type=str, help='kafkahost')
+    parser.add_option('-t', '--kafkatopic', dest='kafkatopic', type=str, help='kafkatopic')
+
+    return parser
+
+
+def main():
+    parser = setup_parser()
     options, args = parser.parse_args()
 
-    if len(args) != 1:
-        parser.print_help()
-        sys.exit(1)
+    daemon = HostNamePubKeyCustomizer(options.cometHost, options.sliceId, options.readToken, options.writeToken,
+                                      options.id, options.kafkahost, options.kafkatopic, options.cometFamily)
 
-    if args[0] == 'start':
-        sys.argv = [sys.argv[0], 'start']
-    elif args[0] == 'stop':
-        sys.argv = [sys.argv[0], 'stop']
-    elif args[0] == 'restart':
-        sys.argv = [sys.argv[0], 'restart']
+    log = daemon.make_logger()
+
+    if len(sys.argv) >= 2:
+        choice = sys.argv[1]
+        if choice == "start":
+            log.info('Administrative operation: START')
+            daemon.start()
+        elif choice == "stop":
+            log.info('Administrative operation: STOP')
+            daemon.stop()
+        elif choice == "restart":
+            daemon.restart()
+        elif choice == "status":
+            daemon.status()
+        elif choice == "reload":
+            daemon.reload()
+        elif choice == "version":
+            daemon.version()
+        else:
+            print("Unknown command.")
+            parser.print_usage()
+            sys.exit(1)
+        sys.exit(0)
     else:
-        parser.print_help()
+        parser.print_usage()
         sys.exit(1)
 
-
-    initial_log_location = '/dev/tty'
-    try:
-    	logfd = open(initial_log_location, 'r')
-    except:
-        initial_log_location = '/dev/null'
-    else:
-        logfd.close()
-
-    log_format = \
-        '%(asctime)s - %(name)s - {%(filename)s:%(lineno)d} - [%(threadName)s] - %(levelname)s - %(message)s'
-    logging.basicConfig(format=log_format, filename=initial_log_location)
-    log = logging.getLogger(LOGGER)
-    log.setLevel('DEBUG')
-
-    app = HostNamePubKeyCustomizer(options.cometHost, options.sliceId, options.readToken, options.writeToken,
-                                   options.id, options.kafkahost, options.kafkatopic, options.cometFamily)
-    daemon_runner = runner.DaemonRunner(app)
-
-    try:
-
-        log_dir = "/var/log/hostkey/"
-        log_level = "DEBUG"
-        log_file = "hostkey.log"
-        log_retain = 5
-        log_file_size = 5000000
-        log_level = 'DEBUG'
-
-        if not os.path.exists(log_dir):
-             os.makedirs(log_dir)
-
-        handler = logging.handlers.RotatingFileHandler(
-                 log_dir + '/' + log_file,
-                 backupCount=log_retain,
-                 maxBytes=log_file_size)
-        handler.setLevel(log_level)
-        formatter = logging.Formatter(log_format)
-        handler.setFormatter(formatter)
-
-        log.addHandler(handler)
-        log.propagate = False
-        log.info('Logging Started')
-
-        daemon_runner.daemon_context.files_preserve = [
-                 handler.stream,
-             ]
-
-        log.info('Administrative operation: %s' % args[0])
-        daemon_runner.do_action()
-        log.info('Administrative after action: %s' % args[0])
-
-        if args[0] == 'stop':
-            app.cleanup()
-
-    except runner.DaemonRunnerStopFailureError as drsfe:
-        log.propagate = True
-        log.error('Unable to stop service; reason was: %s' % str(drsfe))
-        log.error('Exiting...')
-        sys.exit(1)
-    sys.exit(0)
-
-
-if __name__ == '__main__':
-    main()

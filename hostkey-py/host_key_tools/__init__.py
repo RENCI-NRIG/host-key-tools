@@ -1,9 +1,8 @@
 __version__ = '1.0'
 
 import platform
-import ConfigParser
+import configparser
 
-_distro = platform.dist()[0]
 
 _ConfDir = '/etc/hostkey'
 _ConfFile = 'config'
@@ -13,7 +12,7 @@ _PidDir = '/var/run'
 _PidFile = 'hostkeyd.pid'
 
 _LogDir = '/var/log/hostkey'
-_LogFile = 'hostkey-agent.log'
+_LogFile = 'hostkey.log'
 _LogLevel = 'DEBUG'
 _LogRetain = '5'
 _LogFileSize = '5000000'
@@ -21,9 +20,9 @@ _LogFileSize = '5000000'
 _CommandTimeout = '300'
 _PidFileTimeout = '5'
 
-LOGGER = 'host_key_tools_logger'
+LOGGER = 'hostkeyd'
 
-CONFIG = ConfigParser.SafeConfigParser()
+CONFIG = configparser.SafeConfigParser()
 CONFIG.add_section('runtime')
 CONFIG.add_section('logging')
 CONFIG.add_section('linux')

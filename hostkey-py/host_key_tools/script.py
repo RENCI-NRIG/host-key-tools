@@ -22,7 +22,7 @@ import os
 import stat
 import subprocess
 
-from host_key_tools import LOGGER, CONFIG
+from . import LOGGER, CONFIG
 
 import logging
 import logging.handlers
