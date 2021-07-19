@@ -60,8 +60,7 @@ class HostNamePubKeyCustomizer(Daemon):
                                  'DO NOT EDIT BETWEEN THESE LINES. ###\n')
         self.stateDir = '/var/lib/hostkey'
         self.public_ips = f"{self.stateDir}/public.json"
-        self.pidDir = '/var/run'
-        self.pidfile_path = (self.pidDir + '/' + "hostkey.pid" )
+        self.pidfile_path = "/var/run/hostkey.pid"
         self.pidfile_timeout = 10000
         self.kafkahost = kafkahost
         self.kafkaTopic = kafkaTopic
@@ -71,10 +70,6 @@ class HostNamePubKeyCustomizer(Daemon):
         # Need to ensure that the state directory is created.
         if not os.path.exists(self.stateDir):
             os.makedirs(self.stateDir)
-
-        # Ditto for PID directory.
-        if not os.path.exists(self.pidDir):
-            os.makedirs(self.pidDir)
 
     @staticmethod
     def make_logger() -> logging.Logger:
@@ -121,7 +116,7 @@ class HostNamePubKeyCustomizer(Daemon):
 
         if not os.path.exists(self.pidfile_path):
             with open(self.pidfile_path, 'w') as fp:
-                pass
+                fp.write(str(os.getpid()))
 
         super().start()
 
