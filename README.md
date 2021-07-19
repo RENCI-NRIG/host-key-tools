@@ -8,7 +8,8 @@ Mobius Host Key Tools is a python daemon which supports following functionality:
 ## Requirements
 ```
 Kafka-python
-python-daemon==2.1.2
+requests
+paramiko
 psutil
 ```
 ## Install host-key-tools
