@@ -1,3 +1,4 @@
 Kafka-python
 requests
 paramiko
+psutil

@@ -20,7 +20,7 @@ _LogFileSize = '5000000'
 _CommandTimeout = '300'
 _PidFileTimeout = '5'
 
-LOGGER = 'host_key_tools_logger'
+LOGGER = 'hostkeyd'
 
 CONFIG = configparser.SafeConfigParser()
 CONFIG.add_section('runtime')

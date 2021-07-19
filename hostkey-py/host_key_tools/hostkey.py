@@ -34,11 +34,13 @@ from .monitor import ResourceMonitor
 from .script import Script
 from . import LOGGER, CONFIG
 from .graceful_interrupt_handler import GracefulInterruptHandler
+from .daemon import Daemon
 
 
-class HostNamePubKeyCustomizer:
-    def __init__(self, cometHost: str, sliceId: str, readToken: str, writeToken: str, rId, kafkahost: str,
-                 kafkaTopic: str, family: str):
+class HostNamePubKeyCustomizer(Daemon):
+    def __init__(self, cometHost: str, sliceId: str, readToken: str,
+                 writeToken: str, rId, kafkahost: str, kafkaTopic: str, family: str):
+        super().__init__()
         self.firstRun = True
         self.cometHost = cometHost
         self.sliceId = sliceId
@@ -121,6 +123,12 @@ class HostNamePubKeyCustomizer:
         """
         Start the daemon
         """
+        if os.path.exists(self.pidfile_path):
+            self.log.info(f"Daemon already running")
+        else:
+            with open(self.pidfile_path, 'w') as fp:
+                pass
+
         try:
             if self.thread is not None:
                 raise Exception("hostkey daemon has already been started")
@@ -147,6 +155,10 @@ class HostNamePubKeyCustomizer:
             except Exception as e:
                 self.log.error("Could not join actor thread {}".format(e))
                 self.log.error(traceback.format_exc())
+
+        if os.path.exists(self.pidfile_path):
+            self.log.info("Removing the pid file")
+            os.remove(self.pidfile_path)
 
     def get_public_ip(self):
         try:
@@ -706,7 +718,7 @@ class HostNamePubKeyCustomizer:
 
 
 def setup_parser():
-    usage_str = 'Usage: %prog start|stop|restart options'
+    usage_str = f"Usage: {sys.argv[0]} (start|stop|restart|status|reload|version)"
 
     parser = OptionParser(usage=usage_str)
     parser.add_option('-c', '--cometHost', dest='cometHost', type=str, help='Comet Host')
@@ -722,44 +734,36 @@ def setup_parser():
 
 
 def main():
-    log = HostNamePubKeyCustomizer.make_logger()
-    try:
-        parser = setup_parser()
-        options, args = parser.parse_args()
+    parser = setup_parser()
+    options, args = parser.parse_args()
 
-        if len(args) != 1:
-            parser.print_help()
-            sys.exit(1)
+    daemon = HostNamePubKeyCustomizer(options.cometHost, options.sliceId, options.readToken, options.writeToken,
+                                      options.id, options.kafkahost, options.kafkatopic, options.cometFamily)
 
-        start = False
+    log = daemon.make_logger()
 
-        if args[0] == 'start':
-            start = True
-        elif args[0] == 'stop':
-            start = False
+    if len(sys.argv) == 2:
+        choice = sys.argv[1]
+        if choice == "start":
+            log.info('Administrative operation: START')
+            daemon.start()
+        elif choice == "stop":
+            log.info('Administrative operation: STOP')
+            daemon.stop()
+        elif choice == "restart":
+            daemon.restart()
+        elif choice == "status":
+            daemon.status()
+        elif choice == "reload":
+            daemon.reload()
+        elif choice == "version":
+            daemon.version()
         else:
-            parser.print_help()
+            print("Unknown command.")
+            parser.print_usage()
             sys.exit(1)
-
-        app = HostNamePubKeyCustomizer(options.cometHost, options.sliceId, options.readToken, options.writeToken,
-                                       options.id, options.kafkahost, options.kafkatopic, options.cometFamily)
-
-        log.info('Administrative operation: %s' % args[0])
-        with GracefulInterruptHandler() as h:
-            app.start()
-            while True:
-                time.sleep(0.0001)
-                if h.interrupted:
-                    app.stop()
-
-                if args[0] == 'stop':
-                    app.cleanup()
-
-        log.info('Administrative after action: %s' % args[0])
-    except Exception as e:
-        log.propagate = True
-        log.error('Unable to stop service; reason was: %s' % str(e))
-        log.error('Exiting...')
-        log.error(traceback.format_exc())
+        sys.exit(0)
+    else:
+        parser.print_usage()
         sys.exit(1)
-    sys.exit(0)
+
