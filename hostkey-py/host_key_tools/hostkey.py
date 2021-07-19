@@ -22,6 +22,7 @@ import subprocess
 import json
 import sys
 import logging
+import time
 from logging.handlers import RotatingFileHandler
 import traceback
 
@@ -680,6 +681,7 @@ class HostNamePubKeyCustomizer(Daemon):
             self.log.exception(('Caught exception in daemon loop; ' +
                                 'backtrace follows.'))
             self.log.error('Exception was of type: %s' % (str(type(e))))
+        time.sleep(60)
 
     def cleanup(self):
         if self.kafkahost is not None:
@@ -712,7 +714,7 @@ def main():
 
     log = daemon.make_logger()
 
-    if len(sys.argv) == 2:
+    if len(sys.argv) >= 2:
         choice = sys.argv[1]
         if choice == "start":
             log.info('Administrative operation: START')
