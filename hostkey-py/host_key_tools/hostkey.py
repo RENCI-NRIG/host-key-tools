@@ -138,12 +138,13 @@ class HostNamePubKeyCustomizer(Daemon):
 
     def get_public_ip(self):
         try:
-            cmd = ["/bin/curl", "-s", "http://169.254.169.254/2009-04-04/meta-data/public-ipv4"]
+            cmd = ["/bin/curl", "-s", "http://169.254.169.254/latest/meta-data/public-ipv4"]
             completed_process = subprocess.run(cmd, capture_output=True)
-            self.ip = completed_process.stdout.strip()
+            ip = completed_process.stdout.strip()
+            self.ip = str(ip, 'utf-8').strip()
         except Exception as e:
-            self.log.exception('Failed to obtain public ip using command: ' + str(cmd))
-            self.log.error('Exception was of type: %s' % (str(type(e))))
+            self.log.error(f'Failed to obtain public ip using command: {e}')
+            self.log.error(traceback.format_exc())
 
     def fetch_remote_public_ip(self, host: str) -> str:
         try:
@@ -158,12 +159,10 @@ class HostNamePubKeyCustomizer(Daemon):
 
             client.connect(host, username='root', pkey=key)
             stdin, stdout, stderr = client.exec_command("curl http://169.254.169.254/latest/meta-data/public-ipv4")
-            if stderr is None:
-                public_ip = str(stdout.read(), 'utf-8').replace('\\n', '')
-                public_ip = public_ip.strip()
-                self.log.debug(f"Public IP for host: {host} {public_ip}")
+            stdout_str = str(stdout.read(), 'utf-8').strip()
+            self.log.debug(f"Public IP for host: {host} {stdout_str}")
             client.close()
-            return public_ip
+            return stdout_str
         except Exception as e:
             self.log.error(f"Failed to determine public IP for host: {host}: e: {e}")
             self.log.error(traceback.format_exc())
