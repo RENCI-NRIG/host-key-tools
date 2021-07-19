@@ -12,7 +12,7 @@ _PidDir = '/var/run'
 _PidFile = 'hostkeyd.pid'
 
 _LogDir = '/var/log/hostkey'
-_LogFile = 'hostkey-agent.log'
+_LogFile = 'hostkey.log'
 _LogLevel = 'DEBUG'
 _LogRetain = '5'
 _LogFileSize = '5000000'

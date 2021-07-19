@@ -19,8 +19,6 @@
 import os
 import socket
 import subprocess
-import threading
-import time
 import json
 import sys
 import logging
@@ -33,7 +31,6 @@ from .comet_common_iface import CometInterface
 from .monitor import ResourceMonitor
 from .script import Script
 from . import LOGGER, CONFIG
-from .graceful_interrupt_handler import GracefulInterruptHandler
 from .daemon import Daemon
 
 
@@ -78,9 +75,6 @@ class HostNamePubKeyCustomizer(Daemon):
         if not os.path.exists(self.pidDir):
             os.makedirs(self.pidDir)
 
-        self.thread = None
-        self.stopped = False
-
     @staticmethod
     def make_logger() -> logging.Logger:
         """
@@ -123,42 +117,23 @@ class HostNamePubKeyCustomizer(Daemon):
         """
         Start the daemon
         """
-        if os.path.exists(self.pidfile_path):
-            self.log.info(f"Daemon already running")
-        else:
+
+        if not os.path.exists(self.pidfile_path):
             with open(self.pidfile_path, 'w') as fp:
                 pass
 
-        try:
-            if self.thread is not None:
-                raise Exception("hostkey daemon has already been started")
-
-            self.thread = threading.Thread(target=self.run)
-            self.thread.setName(LOGGER)
-            self.thread.setDaemon(True)
-            self.thread.start()
-        except Exception as e:
-            self.log.error(f"Failed to start the daemon: {e}")
-            self.log.error(traceback.format_exc())
+        super().start()
 
     def stop(self):
         """
         Stop the daemon
         """
-        self.stopped = True
-        temp = self.thread
-        self.thread = None
-        if temp is not None:
-            self.log.warning("It seems that the hostkeyd thread is running. Interrupting it")
-            try:
-                temp.join()
-            except Exception as e:
-                self.log.error("Could not join actor thread {}".format(e))
-                self.log.error(traceback.format_exc())
-
         if os.path.exists(self.pidfile_path):
             self.log.info("Removing the pid file")
             os.remove(self.pidfile_path)
+        self.cleanup()
+
+        super().stop()
 
     def get_public_ip(self):
         try:
@@ -684,32 +659,27 @@ class HostNamePubKeyCustomizer(Daemon):
             script.run()
 
     def run(self):
-        while True:
-            if self.stopped:
-                self.log.info(f"{LOGGER} exiting")
-                return
-            try:
-                self.get_public_ip()
-                self.log.debug('Polling')
-                self.updateHostsToComet()
-                self.updatePubKeysToComet()
-                self.updateTokensToComet()
-                self.updatePubKeysFromComet()
-                self.updateHostsFromComet()
-                self.updateTokensFromComet()
-                self.runNewScripts()
-                self.fetch_remote_public_ips()
-                if self.firstRun:
-                    self.pushNodeExporterInfoToMonitoring()
-                self.firstRun = False
-            except KeyboardInterrupt:
-                self.log.error('Terminating on keyboard interrupt...')
-                sys.exit(0)
-            except Exception as e:
-                self.log.exception(('Caught exception in daemon loop; ' +
-                                    'backtrace follows.'))
-                self.log.error('Exception was of type: %s' % (str(type(e))))
-            time.sleep(60)
+        try:
+            self.get_public_ip()
+            self.log.debug('Polling')
+            self.updateHostsToComet()
+            self.updatePubKeysToComet()
+            self.updateTokensToComet()
+            self.updatePubKeysFromComet()
+            self.updateHostsFromComet()
+            self.updateTokensFromComet()
+            self.runNewScripts()
+            self.fetch_remote_public_ips()
+            if self.firstRun:
+                self.pushNodeExporterInfoToMonitoring()
+            self.firstRun = False
+        except KeyboardInterrupt:
+            self.log.error('Terminating on keyboard interrupt...')
+            sys.exit(0)
+        except Exception as e:
+            self.log.exception(('Caught exception in daemon loop; ' +
+                                'backtrace follows.'))
+            self.log.error('Exception was of type: %s' % (str(type(e))))
 
     def cleanup(self):
         if self.kafkahost is not None:
