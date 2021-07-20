@@ -2,11 +2,11 @@
 Description=Host name and key post-boot configuration daemon
 
 [Service]
-Type=simple
+Type=oneshot
+RemainAfterExit=yes
 ExecStart=/usr/local/bin/hostkeyd start -c COMETHOST -s SLICEID -r RTOKEN -w WTOKEN
 ExecStop=/usr/local/bin/hostkeyd stop
-Restart=on-failure
-PIDFile=/var/run/hostkey.pid
+
 
 [Install]
 WantedBy=multi-user.target
