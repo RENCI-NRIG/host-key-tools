@@ -33,6 +33,7 @@ from .monitor import ResourceMonitor
 from .script import Script
 from . import LOGGER, CONFIG
 from .daemon import Daemon
+from .graceful_interrupt_handler import GracefulInterruptHandler
 
 
 class HostNamePubKeyCustomizer(Daemon):
@@ -60,8 +61,6 @@ class HostNamePubKeyCustomizer(Daemon):
                                  'DO NOT EDIT BETWEEN THESE LINES. ###\n')
         self.stateDir = '/var/lib/hostkey'
         self.public_ips = f"{self.stateDir}/public.json"
-        self.pidfile_path = "/var/run/hostkey.pid"
-        self.pidfile_timeout = 10000
         self.kafkahost = kafkahost
         self.kafkaTopic = kafkaTopic
 
@@ -109,26 +108,11 @@ class HostNamePubKeyCustomizer(Daemon):
 
         return log
 
-    def start(self):
-        """
-        Start the daemon
-        """
-
-        if not os.path.exists(self.pidfile_path):
-            with open(self.pidfile_path, 'w') as fp:
-                fp.write(str(os.getpid()))
-
-        super().start()
-
     def stop(self):
         """
         Stop the daemon
         """
-        if os.path.exists(self.pidfile_path):
-            self.log.info("Removing the pid file")
-            os.remove(self.pidfile_path)
         self.cleanup()
-
         super().stop()
 
     def get_public_ip(self):
@@ -713,6 +697,11 @@ def main():
         if choice == "start":
             log.info('Administrative operation: START')
             daemon.start()
+            with GracefulInterruptHandler() as h:
+                while True:
+                    time.sleep(10)
+                    if h.interrupted:
+                        daemon.stop()
         elif choice == "stop":
             log.info('Administrative operation: STOP')
             daemon.stop()
