@@ -121,6 +121,7 @@ class HostNamePubKeyCustomizer(Daemon):
             completed_process = subprocess.run(cmd, capture_output=True)
             ip = completed_process.stdout.strip()
             self.ip = str(ip, 'utf-8').strip()
+            self.log.debug(f"Self Public IP: {self.ip}")
         except Exception as e:
             self.log.error(f'Failed to obtain public ip using command: {e}')
             self.log.error(traceback.format_exc())
@@ -623,11 +624,14 @@ class HostNamePubKeyCustomizer(Daemon):
         return None
 
     def pushNodeExporterInfoToMonitoring(self):
-        if self.kafkahost is not None:
+        ret_val = False 
+        if self.kafkahost is not None and self.ip is not None:
             mon=ResourceMonitor(self.sliceId, self.cometHost, self.readToken, self.kafkaTopic,
                                 kafkaHost=self.kafkahost, log=self.log)
             node_exporter_url = self.ip + ":9100"
-            mon.setupMonitoring(node_exporter_url)
+            ret_val = mon.setupMonitoring(node_exporter_url)
+        return ret_val
+        
 
     def runNewScripts(self):
         scripts = self.updateScriptsFromComet()
@@ -650,8 +654,8 @@ class HostNamePubKeyCustomizer(Daemon):
             self.runNewScripts()
             self.fetch_remote_public_ips()
             if self.firstRun:
-                self.pushNodeExporterInfoToMonitoring()
-            self.firstRun = False
+                if self.pushNodeExporterInfoToMonitoring():
+                    self.firstRun = False
         except KeyboardInterrupt:
             self.log.error('Terminating on keyboard interrupt...')
             sys.exit(0)
