@@ -98,9 +98,11 @@ class ResourceMonitor():
             value_bytes = value.encode(encoding='utf-8')
             producer_instance.send(topic_name, key=key_bytes, value=value_bytes)
             producer_instance.flush()
-            self.logMessage('Message published successfully.')
+            self.logMessage(f'Message {key}={value} published successfully.')
+            return True
         except Exception as ex:
             self.logMessage('Exception in publishing message %s' % (str(type(ex))))
+        return False
 
 
     def connect_kafka_producer(self, host='localhost:9092'):
