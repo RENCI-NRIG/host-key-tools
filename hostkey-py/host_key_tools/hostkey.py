@@ -38,7 +38,7 @@ from .graceful_interrupt_handler import GracefulInterruptHandler
 
 class HostNamePubKeyCustomizer(Daemon):
     def __init__(self, cometHost: str, sliceId: str, readToken: str,
-                 writeToken: str, rId, kafkahost: str, kafkaTopic: str, family: str):
+                 writeToken: str, rId, kafkahost: str, kafkaTopic: str, family: str, public: bool = True):
         super().__init__()
         self.firstRun = True
         self.cometHost = cometHost
@@ -50,6 +50,7 @@ class HostNamePubKeyCustomizer(Daemon):
             rId = socket.gethostname()
         self.rId = rId
         self.hostName = rId
+        self.local_ip = None
         self.ip = None
         self.hostsFile = '/etc/hosts'
         self.keysFile = '/root/.ssh/authorized_keys'
@@ -63,6 +64,7 @@ class HostNamePubKeyCustomizer(Daemon):
         self.public_ips = f"{self.stateDir}/public.json"
         self.kafkahost = kafkahost
         self.kafkaTopic = kafkaTopic
+        self.public = public
 
         self.log = self.make_logger()
 
@@ -114,6 +116,17 @@ class HostNamePubKeyCustomizer(Daemon):
         """
         self.cleanup()
         super().stop()
+
+    def get_private_ip(self):
+        try:
+            cmd = ["/bin/curl", "-s", "http://169.254.169.254/latest/meta-data/local-ipv4"]
+            completed_process = subprocess.run(cmd, capture_output=True)
+            ip = completed_process.stdout.strip()
+            self.local_ip = str(ip, 'utf-8').strip()
+            self.log.debug(f"Self Private IP: {self.local_ip}")
+        except Exception as e:
+            self.log.error(f'Failed to obtain public ip using command: {e}')
+            self.log.error(traceback.format_exc())
 
     def get_public_ip(self):
         try:
@@ -566,7 +579,10 @@ class HostNamePubKeyCustomizer(Daemon):
                     self.log.debug("h[ip]=" + h["ip"] + " ip=" + self.ip)
                     if h["hostName"].replace('/','-') == self.hostName and h["ip"] == "" :
                     #if h["hostName"].replace('/','-') == self.hostName and h["ip"] != self.ip :
-                         h["ip"] = self.ip
+                         if self.public:
+                             h["ip"] = self.ip
+                         else:
+                             h["ip"] = self.local_ip
                          checker = True
                 if checker :
                     val = {}
@@ -644,6 +660,7 @@ class HostNamePubKeyCustomizer(Daemon):
     def run(self):
         try:
             self.get_public_ip()
+            self.get_private_ip()
             self.log.debug('Polling')
             self.updateHostsToComet()
             self.updatePubKeysToComet()
@@ -683,6 +700,7 @@ def setup_parser():
     parser.add_option('-i', '--id', dest='id', type=str, help='id')
     parser.add_option('-k', '--kafkahost', dest='kafkahost', type=str, help='kafkahost')
     parser.add_option('-t', '--kafkatopic', dest='kafkatopic', type=str, help='kafkatopic')
+    parser.add_option('-p', '--public', dest='public', type=bool, help='True for Public IP and False for Private IP', required=False, default=True)
 
     return parser
 
@@ -692,7 +710,7 @@ def main():
     options, args = parser.parse_args()
 
     daemon = HostNamePubKeyCustomizer(options.cometHost, options.sliceId, options.readToken, options.writeToken,
-                                      options.id, options.kafkahost, options.kafkatopic, options.cometFamily)
+                                      options.id, options.kafkahost, options.kafkatopic, options.cometFamily, options.public)
 
     log = daemon.make_logger()
 
