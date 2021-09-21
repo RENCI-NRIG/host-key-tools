@@ -700,7 +700,7 @@ def setup_parser():
     parser.add_option('-i', '--id', dest='id', type=str, help='id')
     parser.add_option('-k', '--kafkahost', dest='kafkahost', type=str, help='kafkahost')
     parser.add_option('-t', '--kafkatopic', dest='kafkatopic', type=str, help='kafkatopic')
-    parser.add_option('-p', '--public', dest='public', type=bool, help='True for Public IP and False for Private IP', required=False, default=True)
+    parser.add_option('-p', '--public', dest='public', type=str, help='True for Public IP and False for Private IP', default='True')
 
     return parser
 
@@ -708,9 +708,12 @@ def setup_parser():
 def main():
     parser = setup_parser()
     options, args = parser.parse_args()
+    public = True
+    if options.public != 'True':
+         public = False
 
     daemon = HostNamePubKeyCustomizer(options.cometHost, options.sliceId, options.readToken, options.writeToken,
-                                      options.id, options.kafkahost, options.kafkatopic, options.cometFamily, options.public)
+                                      options.id, options.kafkahost, options.kafkatopic, options.cometFamily, public)
 
     log = daemon.make_logger()
 
