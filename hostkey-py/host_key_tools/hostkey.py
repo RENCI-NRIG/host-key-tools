@@ -119,7 +119,7 @@ class HostNamePubKeyCustomizer(Daemon):
 
     def get_private_ip(self):
         try:
-            cmd = ["/bin/curl", "-s", "http://169.254.169.254/latest/meta-data/local-ipv4"]
+            cmd = ["/usr/bin/curl", "-s", "http://169.254.169.254/latest/meta-data/local-ipv4"]
             completed_process = subprocess.run(cmd, capture_output=True)
             ip = completed_process.stdout.strip()
             self.local_ip = str(ip, 'utf-8').strip()
@@ -130,7 +130,7 @@ class HostNamePubKeyCustomizer(Daemon):
 
     def get_public_ip(self):
         try:
-            cmd = ["/bin/curl", "-s", "http://169.254.169.254/latest/meta-data/public-ipv4"]
+            cmd = ["/usr/bin/curl", "-s", "http://169.254.169.254/latest/meta-data/public-ipv4"]
             completed_process = subprocess.run(cmd, capture_output=True)
             ip = completed_process.stdout.strip()
             self.ip = str(ip, 'utf-8').strip()
@@ -576,15 +576,15 @@ class HostNamePubKeyCustomizer(Daemon):
                     return
                 for h in hosts :
                     self.log.debug("Processing host " + h["hostName"])
-                    self.log.debug("h[ip]=" + h["ip"] + " ip=" + self.ip)
-                    if h["hostName"].replace('/','-') == self.hostName and h["ip"] == "" :
+                    self.log.debug(f"h[ip]={h['ip']} ip={self.ip}")
+                    if h["hostName"].replace('/','-') == self.hostName and (h["ip"] == "" or h["ip"] is None):
                     #if h["hostName"].replace('/','-') == self.hostName and h["ip"] != self.ip :
                          if self.public:
                              h["ip"] = self.ip
                          else:
                              h["ip"] = self.local_ip
                          checker = True
-                if checker :
+                if checker:
                     val = {}
                     val["val_"] = json.dumps(hosts)
                     newVal = json.dumps(val)
@@ -593,7 +593,7 @@ class HostNamePubKeyCustomizer(Daemon):
                                                      self.writeToken, section, json.loads(newVal))
                     if resp.status_code != 200:
                         self.log.debug("Failure occurred in updating hosts to comet" + section)
-                else :
+                else:
                     self.log.debug("Nothing to update")
         except Exception as e:
             self.log.error('Exception was of type: %s' % (str(type(e))))
